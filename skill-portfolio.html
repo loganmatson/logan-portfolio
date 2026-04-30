@@ -1,0 +1,761 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Logan Matson — Skill Portfolio</title>
+<link href="https://fonts.googleapis.com/css2?family=Instrument+Serif&family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+<style>
+/* ───────────── DATA ───────────── */
+:root {
+  --bg: #fafaf8;
+  --surface: #ffffff;
+  --text: #1a1a1a;
+  --muted: #6b6b6b;
+  --border: #e5e5e0;
+  --accent-sage: #5a7a64;
+  --accent-gold: #c9a84c;
+  --accent-indigo: #5b5fc7;
+  --accent-emerald: #3d8b5e;
+  --accent-cyan: #2a8a9e;
+  --accent-rose: #b5465a;
+  --accent-amber: #b8862d;
+  --r: 4px;
+  --shadow-sm: 0 1px 3px rgba(0,0,0,0.06);
+  --shadow-md: 0 4px 16px rgba(0,0,0,0.08);
+  --shadow-lg: 0 8px 32px rgba(0,0,0,0.10);
+  --serif: 'Instrument Serif', serif;
+  --sans: 'Inter', -apple-system, sans-serif;
+}
+[data-theme="dark"] {
+  --bg: #131316;
+  --surface: #1e1e22;
+  --text: #e8e8e4;
+  --muted: #8a8a8a;
+  --border: #2a2a2e;
+  --shadow-sm: 0 1px 3px rgba(0,0,0,0.2);
+  --shadow-md: 0 4px 16px rgba(0,0,0,0.3);
+  --shadow-lg: 0 8px 32px rgba(0,0,0,0.35);
+}
+* { margin:0; padding:0; box-sizing:border-box; }
+html { scroll-behavior: smooth; }
+body {
+  background: var(--bg);
+  color: var(--text);
+  font-family: var(--sans);
+  font-size: 15px;
+  line-height: 1.6;
+  -webkit-font-smoothing: antialiased;
+}
+
+/* ───────────── HEADER ───────────── */
+header {
+  position: fixed;
+  top: 0; left: 0; right: 0;
+  z-index: 100;
+  background: var(--bg);
+  border-bottom: 1px solid var(--border);
+  backdrop-filter: blur(12px);
+}
+.header-inner {
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 14px 40px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+.logo {
+  font-family: var(--serif);
+  font-size: 1.15rem;
+  color: var(--text);
+  letter-spacing: -0.01em;
+}
+.logo span { color: var(--accent-sage); }
+.header-right { display: flex; align-items: center; gap: 20px; }
+.theme-toggle {
+  width: 36px; height: 36px;
+  border: 1px solid var(--border);
+  border-radius: 50%;
+  background: var(--surface);
+  cursor: pointer;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 16px;
+  transition: all 0.2s;
+}
+.theme-toggle:hover { border-color: var(--accent-sage); }
+.nav-link {
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--muted);
+  text-decoration: none;
+  transition: color 0.2s;
+}
+.nav-link:hover { color: var(--text); }
+
+/* ───────────── HERO ───────────── */
+.hero {
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 120px 40px 40px;
+}
+.hero-eyebrow {
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--accent-sage);
+  margin-bottom: 16px;
+}
+.hero h1 {
+  font-family: var(--serif);
+  font-size: 3.6rem;
+  line-height: 1.08;
+  letter-spacing: -0.02em;
+  color: var(--text);
+  margin-bottom: 20px;
+  max-width: 700px;
+}
+.hero-sub {
+  font-size: 17px;
+  color: var(--muted);
+  max-width: 540px;
+  line-height: 1.65;
+  margin-bottom: 40px;
+}
+
+/* ───────────── TICKER ───────────── */
+.ticker-wrap {
+  border-top: 1px solid var(--border);
+  border-bottom: 1px solid var(--border);
+  overflow: hidden;
+  background: var(--surface);
+}
+.ticker {
+  display: flex;
+  animation: tickerScroll 30s linear infinite;
+  white-space: nowrap;
+  padding: 12px 0;
+}
+.ticker-item {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 0 32px;
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--muted);
+  flex-shrink: 0;
+}
+.ticker-item .val {
+  color: var(--text);
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+.ticker-item .dot {
+  width: 4px; height: 4px;
+  background: var(--accent-gold);
+  border-radius: 50%;
+}
+@keyframes tickerScroll {
+  0% { transform: translateX(0); }
+  100% { transform: translateX(-50%); }
+}
+
+/* ───────────── SECTIONS ───────────── */
+.section {
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 64px 40px;
+}
+.section-label {
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--accent-sage);
+  margin-bottom: 8px;
+}
+.section-title {
+  font-family: var(--serif);
+  font-size: 2rem;
+  margin-bottom: 40px;
+  color: var(--text);
+}
+
+/* ───────────── FEATURED CARDS ───────────── */
+.featured-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 20px;
+}
+.feat-card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--r);
+  padding: 28px;
+  position: relative;
+  transition: all 0.3s ease;
+  cursor: default;
+  border-left: 3px solid var(--cat-color, var(--border));
+}
+.feat-card:hover {
+  box-shadow: var(--shadow-md);
+  transform: translateY(-2px);
+}
+.feat-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  margin-bottom: 16px;
+}
+.feat-name {
+  font-family: var(--serif);
+  font-size: 1.35rem;
+  color: var(--text);
+}
+.feat-emoji {
+  font-size: 1.6rem;
+  line-height: 1;
+}
+.feat-story {
+  font-size: 15px;
+  color: var(--text);
+  line-height: 1.6;
+  margin-bottom: 20px;
+  font-style: italic;
+}
+.feat-desc {
+  font-size: 13px;
+  color: var(--muted);
+  line-height: 1.5;
+  margin-bottom: 20px;
+}
+.feat-stats {
+  display: flex;
+  gap: 20px;
+  padding-top: 16px;
+  border-top: 1px solid var(--border);
+}
+.feat-stat {
+  display: flex;
+  flex-direction: column;
+}
+.feat-stat-val {
+  font-size: 18px;
+  font-weight: 700;
+  color: var(--text);
+  font-variant-numeric: tabular-nums;
+}
+.feat-stat-label {
+  font-size: 11px;
+  color: var(--muted);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+.cat-tag {
+  display: inline-block;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  padding: 3px 8px;
+  border-radius: 2px;
+  background: var(--cat-bg, #f0f0ee);
+  color: var(--cat-color, var(--muted));
+  margin-top: 12px;
+}
+[data-theme="dark"] .cat-tag { opacity: 0.85; }
+
+/* Category colors */
+.cat-research { --cat-color: var(--accent-indigo); --cat-bg: #ededfa; }
+.cat-health { --cat-color: var(--accent-emerald); --cat-bg: #e6f4ec; }
+.cat-meta { --cat-color: var(--accent-amber); --cat-bg: #faf0db; }
+.cat-workflow { --cat-color: var(--accent-cyan); --cat-bg: #e0f3f7; }
+.cat-creative { --cat-color: var(--accent-rose); --cat-bg: #fae6ea; }
+[data-theme="dark"] .cat-research { --cat-bg: #24243a; }
+[data-theme="dark"] .cat-health { --cat-bg: #1a2e22; }
+[data-theme="dark"] .cat-meta { --cat-bg: #2e2818; }
+[data-theme="dark"] .cat-workflow { --cat-bg: #1a2c30; }
+[data-theme="dark"] .cat-creative { --cat-bg: #2e1a20; }
+
+/* ───────────── FILTER PILLS ───────────── */
+.filters {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 32px;
+  flex-wrap: wrap;
+}
+.filter-pill {
+  padding: 6px 16px;
+  font-size: 12px;
+  font-weight: 600;
+  border: 1px solid var(--border);
+  border-radius: 20px;
+  background: transparent;
+  color: var(--muted);
+  cursor: pointer;
+  transition: all 0.2s;
+}
+.filter-pill:hover { border-color: var(--accent-sage); color: var(--text); }
+.filter-pill.active {
+  background: var(--accent-sage);
+  color: #fff;
+  border-color: var(--accent-sage);
+}
+
+/* ───────────── COMPACT GRID ───────────── */
+.compact-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 12px;
+}
+.compact-card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--r);
+  padding: 18px 20px;
+  cursor: pointer;
+  transition: all 0.25s ease;
+  border-left: 3px solid var(--cat-color, var(--border));
+}
+.compact-card:hover {
+  box-shadow: var(--shadow-sm);
+  border-color: var(--cat-color, var(--border));
+}
+.compact-card.hidden { display: none; }
+.compact-head {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 4px;
+}
+.compact-emoji { font-size: 1.1rem; }
+.compact-name {
+  font-weight: 600;
+  font-size: 14px;
+  color: var(--text);
+}
+.compact-desc {
+  font-size: 12px;
+  color: var(--muted);
+  line-height: 1.45;
+}
+.compact-expand {
+  max-height: 0;
+  overflow: hidden;
+  transition: max-height 0.3s ease, padding 0.3s ease;
+}
+.compact-card.open .compact-expand {
+  max-height: 200px;
+  padding-top: 14px;
+  margin-top: 12px;
+  border-top: 1px solid var(--border);
+}
+.compact-expand-inner {
+  font-size: 13px;
+  color: var(--muted);
+  line-height: 1.5;
+}
+.compact-expand-inner .ex-label {
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--accent-sage);
+  margin-bottom: 4px;
+}
+
+/* ───────────── HOW IT WORKS ───────────── */
+.how-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 32px;
+  position: relative;
+}
+.how-grid::before,
+.how-grid::after {
+  content: '→';
+  position: absolute;
+  top: 50%;
+  transform: translateY(-50%);
+  font-size: 24px;
+  color: var(--accent-sage);
+  font-weight: 300;
+}
+.how-grid::before { left: calc(33.33% - 16px); }
+.how-grid::after { left: calc(66.66% - 16px); }
+.how-step {
+  text-align: center;
+  padding: 32px 24px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--r);
+}
+.how-num {
+  font-family: var(--serif);
+  font-size: 2.4rem;
+  color: var(--accent-sage);
+  margin-bottom: 8px;
+}
+.how-label {
+  font-size: 18px;
+  font-weight: 700;
+  margin-bottom: 8px;
+}
+.how-desc {
+  font-size: 13px;
+  color: var(--muted);
+  line-height: 1.5;
+}
+
+/* ───────────── FOOTER ───────────── */
+footer {
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 40px 40px 60px;
+  border-top: 1px solid var(--border);
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+.footer-text {
+  font-size: 13px;
+  color: var(--muted);
+}
+.footer-text a {
+  color: var(--accent-sage);
+  text-decoration: none;
+}
+
+/* ───────────── ANIMATIONS ───────────── */
+.fade-up {
+  opacity: 0;
+  transform: translateY(20px);
+  transition: opacity 0.6s ease, transform 0.6s ease;
+}
+.fade-up.visible {
+  opacity: 1;
+  transform: translateY(0);
+}
+
+/* ───────────── RESPONSIVE ───────────── */
+@media (max-width: 1024px) {
+  .featured-grid { grid-template-columns: repeat(2, 1fr); }
+  .compact-grid { grid-template-columns: repeat(3, 1fr); }
+}
+@media (max-width: 768px) {
+  .hero h1 { font-size: 2.4rem; }
+  .featured-grid { grid-template-columns: 1fr; }
+  .compact-grid { grid-template-columns: repeat(2, 1fr); }
+  .how-grid { grid-template-columns: 1fr; gap: 16px; }
+  .how-grid::before, .how-grid::after { display: none; }
+  .section { padding: 40px 24px; }
+  .hero { padding: 100px 24px 32px; }
+  .header-inner { padding: 14px 24px; }
+}
+</style>
+</head>
+<body>
+
+<!-- ───────────── DATA BLOCK ───────────── -->
+<script>
+const DATA = {
+  stats: {
+    totalSkills: 32,
+    projectSkills: 11,
+    liveAgents: 6,
+    subagents: "25+",
+    avgEval: "50+"
+  },
+  featured: [
+    {
+      name: "/optimize-week",
+      emoji: "⚡",
+      category: "workflow",
+      story: "One command, zero handoffs. It plans my training, meals, and groceries — then recalibrates itself monthly against my Whoop biometrics so it gets smarter every week.",
+      description: "Self-calibrating 5-agent weekly optimizer. Phase 0.5 Retrospective Validator updates agent-weights.json monthly against real biometric outcomes. Opens with an 8-question Week Brief.",
+      stats: [
+        { val: "5", label: "Agents Chained" },
+        { val: "~150K", label: "Tokens/Run" },
+        { val: "Weekly", label: "Cadence" }
+      ]
+    },
+    {
+      name: "/tony-stark",
+      emoji: "🧪",
+      category: "meta",
+      story: "Runs the same prompt with and without a skill loaded, then grades both against assertions. The skill version averaged 95.5% vs 86.4% baseline — 9.1 points from a SKILL.md.",
+      description: "Skill evaluation framework. A/B testing, assertion grading, pass rate + token cost comparison. Creates, tests, audits, and benchmarks skills end-to-end.",
+      stats: [
+        { val: "95.5%", label: "With Skill" },
+        { val: "86.4%", label: "Baseline" },
+        { val: "+9.1pp", label: "Improvement" }
+      ]
+    },
+    {
+      name: "/darth-vader",
+      emoji: "⚔️",
+      category: "meta",
+      story: "Before I build anything, Vader reads the plan and finds every way it fails. It's caught compounding errors, silent assumptions, and sequencing traps before they cost me 50K tokens.",
+      description: "Devil's advocate skill. Stress-tests agent designs, builds, and career decisions before execution. Proactively triggers before pipelines run and before builds spec out — not just when asked.",
+      stats: [
+        { val: "3+", label: "Failure Modes" },
+        { val: "Pre-Build", label: "Timing" },
+        { val: "Proactive", label: "Trigger" }
+      ]
+    },
+    {
+      name: "/shakespeare",
+      emoji: "✍️",
+      category: "creative",
+      story: "This blog post you're reading? Written by a skill. It reads a voice calibration file built from my actual writing, then drafts in my voice — not Claude's.",
+      description: "Personal writing agent. 6 formats: text, email, blog, Slack, LinkedIn, stat reports. Voice calibration file loaded before every draft. Clarifying questions before writing.",
+      stats: [
+        { val: "6", label: "Formats" },
+        { val: "Voice", label: "Calibrated" },
+        { val: "~20K", label: "Tokens/Run" }
+      ]
+    },
+    {
+      name: "/ghengis-khan",
+      emoji: "👑",
+      category: "meta",
+      story: "At the end of every session, Ghengis surveys the empire: fixes broken frontmatter, moves misplaced skills, creates new ones from session patterns, and backs everything up. The empire doesn't drift.",
+      description: "End-of-session skill commander. 9-phase pipeline: scan, territory check, create, improve, destroy (approval required), memory update, backup, token audit, optional deep clean.",
+      stats: [
+        { val: "9", label: "Phases" },
+        { val: "33", label: "Skills Managed" },
+        { val: "Auto", label: "Backup" }
+      ]
+    },
+    {
+      name: "/john-wooden",
+      emoji: "🏀",
+      category: "meta",
+      story: "Not just a one-off fix — Wooden reads every correction across sessions, finds the systemic pattern, and tells me what keeps going wrong and why.",
+      description: "Holistic skill coach. Reads feedback patterns across sessions, surfaces Tier 1/2/3 systemic issues, and runs a Coach's Report. Designed to prevent the same mistake twice.",
+      stats: [
+        { val: "3", label: "Issue Tiers" },
+        { val: "Cross-Session", label: "Scope" },
+        { val: "Pattern", label: "Detection" }
+      ]
+    }
+  ],
+  skills: [
+    { name: "/gordon-ramsay", emoji: "🍳", category: "health", desc: "Autonomous meal planning agent. GCal strain mapping, Tier 1/2/3 protein placement, 9 outputs", example: "Mapped training strain to protein tiers and generated a full PWA + cook schedule in one run" },
+    { name: "/whoop-report", emoji: "📈", category: "health", desc: "7-subagent pipeline: parallel analysis agents produce a PDF brief + interactive scorecard. SA1 runs on Haiku (CSV cleaning); SA2–7 on Sonnet (analysis, PDF, HTML).", example: "Dispatched 7 subagents in parallel: cleaning, sleep, strain, recovery, correlations, PDF, scorecard" },
+    { name: "/neurologist-agent", emoji: "🧠", category: "health", desc: "Self-calibrating seizure risk forecaster using 30-day baseline and Whoop biometrics", example: "Flagged a HIGH risk day based on travel + poor sleep + missed recovery window alignment" },
+    { name: "/moneyball", emoji: "📊", category: "research", desc: "Data-driven analyst — statistics, historical data, verified facts. Never opinions", example: "Built a March Madness bracket now in the 99.5th percentile vs 74th for the casual pick" },
+    { name: "/sherlock", emoji: "🔍", category: "research", desc: "Investigate options, compare tradeoffs, give a single recommendation", example: "Compared 5 hosting options for morning digest: LaunchAgent won on cost and simplicity" },
+    { name: "/personal-finance", emoji: "💰", category: "research", desc: "Context-aware financial planning guide — interviews, applies JL defaults, routes to right tool", example: "Built a post-grad budget for Charleston SC on $ with Roth IRA and emergency fund timeline" },
+    { name: "/bob-the-builder", emoji: "🏗️", category: "creative", desc: "Builds interactive HTML PWAs, dashboards, and analytical reports. Phase 5.5 screenshots the output and self-checks against the design spec; Phase 5.7 self-rates 1–10 and runs a darth-vader quality audit before logging.", example: "Built an Agent Ecosystem Workflow Demo with SVG flow diagram and drill-down panels" },
+    { name: "/edu-html", emoji: "🎓", category: "creative", desc: "Interactive HTML study guides — reveals, MC quiz, flip flashcards, and exam traps", example: "Built a CTI Test 2 guide with 40 concepts, MC quiz, flip cards, and exam trap alerts" },
+    { name: "/joe-rogan", emoji: "🎙️", category: "creative", desc: "Interview-driven NotebookLM automation for podcasts and study materials", example: "Generates audio summaries, quizzes, and flashcards from document sources" },
+    { name: "/yoda", emoji: "🧙", category: "creative", desc: "Plain-English explainer. Analogy first, then clear detail", example: "Explained KenPom efficiency ratings as a batting average for basketball teams" },
+    { name: "/templates", emoji: "🧩", category: "creative", desc: "Reusable HTML/CSS component catalog for Bob builds", example: "10 patterns: card grids, stat badges, tab navs, comparison layouts" },
+    { name: "/sportscenter", emoji: "📺", category: "meta", desc: "Session recap: what was built, current state, next steps — chains ghengis-khan + name-tag", example: "Chains ghengis-khan → name-tag → john-wooden offer in one command" },
+    { name: "/jarvis", emoji: "💡", category: "meta", desc: "Elite consultant: 3 short-term + 1 long-term idea grounded in current context", example: "Suggested publishing skill-portfolio to GitHub Pages as a long-term portfolio anchor" },
+    { name: "/mario", emoji: "🍄", category: "meta", desc: "Token usage tracker with ranked efficiency recommendations", example: "Identified that a 7-agent whoop-report costs ~87K tokens per run" },
+    { name: "/tim-brief", emoji: "📝", category: "meta", desc: "Weekly Tim conversation prep — 3 curated talking points filtered for his interests", example: "Built 3 defensible points on skill architecture + agent orchestration for a 10-minute call" },
+    { name: "/name-tag", emoji: "🏷️", category: "meta", desc: "Auto-names sessions with descriptive slugs for easy resume", example: "Tagged a session as gordon-ramsay-mar21 so claude --resume finds it instantly" },
+    { name: "/halftime", emoji: "📍", category: "workflow", desc: "Mid-session status: done, in progress, up next", example: "Quick 3-section bullet summary without git or memory updates" },
+    { name: "/debug", emoji: "🐛", category: "workflow", desc: "Systematic bug investigation: reproduce, isolate, fix, verify", example: "Traced a nested session error to a CLAUDECODE env var blocking LaunchAgent runs" },
+    { name: "/blueprint", emoji: "📐", category: "workflow", desc: "Token-efficient file work: scout, dry-run preview, batch execute", example: "Saved ~4,200 tokens by reading 80 lines instead of 980 on a large HTML file" },
+    { name: "/review", emoji: "🔒", category: "workflow", desc: "Audit code for bugs, security issues, and convention violations", example: "Caught an XSS vulnerability in a Bob build before deployment" },
+    { name: "/gws-agent", emoji: "📧", category: "workflow", desc: "Google Workspace automation across Gmail, Drive, Docs, Sheets, Calendar", example: "Runs morning digest pipeline: research, draft, format, send via Gmail" },
+    { name: "/interview", emoji: "🎤", category: "workflow", desc: "Spec-driven interview before any new build or agent. Minimum 10 questions — doesn't write the SPEC.md until confidence hits 98%.", example: "10 targeted questions before a Bob build locked the data model before a single line of HTML was written" },
+    { name: "/stephen-covey", emoji: "📋", category: "workflow", desc: "Reorganizes the todolist using Covey Quadrant 2 framework", example: "Restructured 20+ tasks into Do Now, Schedule, Defer, and Done categories" },
+    { name: "/critical-prompt", emoji: "🎯", category: "workflow", desc: "CRITICAL framework prompt builder — interviews you, then writes a structured Claude prompt", example: "Turned a vague request into a 200-word prompt with role, context, and criteria" },
+    { name: "/github", emoji: "🐙", category: "workflow", desc: "GitHub repo management: push files, create repos, enable Pages, manage branches", example: "Pushed gaming-mindset.html to loganmatson.github.io/ai-class in 4 commands" },
+    { name: "/multiple-choice", emoji: "✅", category: "workflow", desc: "MC question quality guardrail — prevents answer-position bias and length bias", example: "Caught B-overuse in a 20-question quiz set where B was correct 14 times" }
+  ]
+};
+
+const CATEGORIES = {
+  research: { label: "Research", color: "cat-research" },
+  health: { label: "Health", color: "cat-health" },
+  meta: { label: "Meta", color: "cat-meta" },
+  workflow: { label: "Workflow", color: "cat-workflow" },
+  creative: { label: "Creative", color: "cat-creative" }
+};
+</script>
+
+<!-- ───────────── HEADER ───────────── -->
+<header>
+  <div class="header-inner">
+    <div class="logo">Logan Matson <span>/ Skills</span></div>
+    <div class="header-right">
+      <a href="#featured" class="nav-link">Featured</a>
+      <a href="#arsenal" class="nav-link">All Skills</a>
+      <a href="#how" class="nav-link">How It Works</a>
+      <button class="theme-toggle" onclick="toggleTheme()" aria-label="Toggle theme">☀️</button>
+    </div>
+  </div>
+</header>
+
+<!-- ───────────── HERO ───────────── -->
+<section class="hero">
+  <div class="hero-eyebrow">Claude Code in VSCode</div>
+  <h1>32 Skills. 6 Agents. Measured.</h1>
+  <p class="hero-sub">Custom AI skills built to research, analyze, plan, and write — each one tested, measured, and evolving through structured feedback loops.</p>
+</section>
+
+<!-- ───────────── TICKER ───────────── -->
+<div class="ticker-wrap">
+  <div class="ticker" id="ticker"></div>
+</div>
+
+<!-- ───────────── FEATURED ───────────── -->
+<section class="section" id="featured">
+  <div class="section-label">Spotlight</div>
+  <h2 class="section-title">Featured Skills</h2>
+  <div class="featured-grid" id="featuredGrid"></div>
+</section>
+
+<!-- ───────────── ALL SKILLS ───────────── -->
+<section class="section" id="arsenal">
+  <div class="section-label">Directory</div>
+  <h2 class="section-title">The Full Arsenal</h2>
+  <div class="filters" id="filters"></div>
+  <div class="compact-grid" id="compactGrid"></div>
+</section>
+
+<!-- ───────────── HOW IT WORKS ───────────── -->
+<section class="section" id="how">
+  <div class="section-label">Process</div>
+  <h2 class="section-title">How It Works</h2>
+  <div class="how-grid">
+    <div class="how-step fade-up">
+      <div class="how-num">1</div>
+      <div class="how-label">Write</div>
+      <div class="how-desc">Define your workflow as a skill: phases, rules, output format. Save it once as a markdown file.</div>
+    </div>
+    <div class="how-step fade-up">
+      <div class="how-num">2</div>
+      <div class="how-label">Test</div>
+      <div class="how-desc">A/B test with /tony-stark. Run the same prompt with and without the skill. Grade against assertions.</div>
+    </div>
+    <div class="how-step fade-up">
+      <div class="how-num">3</div>
+      <div class="how-label">Evolve</div>
+      <div class="how-desc">Guardrails capture mistakes. /ghengis-khan reviews every session. /john-wooden coaches systemic improvements.</div>
+    </div>
+  </div>
+</section>
+
+<!-- ───────────── FOOTER ───────────── -->
+<footer>
+  <div class="footer-text">Built with Claude Code in VSCode</div>
+  <div class="footer-text">Logan Matson · 2026</div>
+</footer>
+
+<!-- ───────────── JS ───────────── -->
+<script>
+// Theme
+function toggleTheme() {
+  const d = document.documentElement;
+  const dark = d.getAttribute('data-theme') === 'dark';
+  d.setAttribute('data-theme', dark ? '' : 'dark');
+  document.querySelector('.theme-toggle').textContent = dark ? '☀️' : '🌙';
+  localStorage.setItem('theme', dark ? 'light' : 'dark');
+}
+(function() {
+  const saved = localStorage.getItem('theme');
+  if (saved === 'dark' || (!saved && window.matchMedia('(prefers-color-scheme: dark)').matches)) {
+    document.documentElement.setAttribute('data-theme', 'dark');
+    document.querySelector('.theme-toggle').textContent = '🌙';
+  }
+})();
+
+// Ticker
+(function() {
+  const items = [
+    { label: "Total Skills", val: "32" },
+    { label: "Live Agents", val: "6" },
+    { label: "Subagents", val: "25+" },
+    { label: "Bob Builds", val: "20+" },
+    { label: "Sessions", val: "50+" },
+    { label: "Skill vs Baseline", val: "+9.1pp" },
+    { label: "Bracket Percentile", val: "99.5th" },
+    { label: "Optimize-Week Tokens", val: "~150K" },
+    { label: "Writing Formats", val: "6" },
+    { label: "Whoop Subagents", val: "7" }
+  ];
+  const ticker = document.getElementById('ticker');
+  // Duplicate for seamless loop
+  const html = items.map(i => `<span class="ticker-item"><span class="dot"></span>${i.label} <span class="val">${i.val}</span></span>`).join('');
+  ticker.innerHTML = html + html;
+})();
+
+// Featured cards
+(function() {
+  const grid = document.getElementById('featuredGrid');
+  grid.innerHTML = DATA.featured.map(s => {
+    const cat = CATEGORIES[s.category];
+    return `<div class="feat-card ${cat.color} fade-up">
+      <div class="feat-head">
+        <div class="feat-name">${s.name}</div>
+        <div class="feat-emoji">${s.emoji}</div>
+      </div>
+      <div class="feat-story">"${s.story}"</div>
+      <div class="feat-desc">${s.description}</div>
+      <div class="feat-stats">
+        ${s.stats.map(st => `<div class="feat-stat"><span class="feat-stat-val">${st.val}</span><span class="feat-stat-label">${st.label}</span></div>`).join('')}
+      </div>
+      <div class="cat-tag ${cat.color}">${cat.label}</div>
+    </div>`;
+  }).join('');
+})();
+
+// Filters
+(function() {
+  const container = document.getElementById('filters');
+  const cats = ['all', ...Object.keys(CATEGORIES)];
+  container.innerHTML = cats.map(c => {
+    const label = c === 'all' ? 'All' : CATEGORIES[c].label;
+    return `<button class="filter-pill ${c === 'all' ? 'active' : ''}" data-cat="${c}">${label}</button>`;
+  }).join('');
+  container.addEventListener('click', e => {
+    const pill = e.target.closest('.filter-pill');
+    if (!pill) return;
+    container.querySelectorAll('.filter-pill').forEach(p => p.classList.remove('active'));
+    pill.classList.add('active');
+    const cat = pill.dataset.cat;
+    document.querySelectorAll('.compact-card').forEach(card => {
+      card.classList.toggle('hidden', cat !== 'all' && card.dataset.cat !== cat);
+      card.classList.remove('open');
+    });
+  });
+})();
+
+// Compact grid
+(function() {
+  const grid = document.getElementById('compactGrid');
+  grid.innerHTML = DATA.skills.map(s => {
+    const cat = CATEGORIES[s.category];
+    return `<div class="compact-card ${cat.color} fade-up" data-cat="${s.category}" onclick="this.classList.toggle('open')">
+      <div class="compact-head">
+        <span class="compact-emoji">${s.emoji}</span>
+        <span class="compact-name">${s.name}</span>
+      </div>
+      <div class="compact-desc">${s.desc}</div>
+      <div class="compact-expand">
+        <div class="compact-expand-inner">
+          <div class="ex-label">Example</div>
+          ${s.example}
+        </div>
+      </div>
+    </div>`;
+  }).join('');
+})();
+
+// Scroll fade-up
+const observer = new IntersectionObserver(entries => {
+  entries.forEach(e => { if (e.isIntersecting) e.target.classList.add('visible'); });
+}, { threshold: 0.1 });
+document.querySelectorAll('.fade-up').forEach(el => observer.observe(el));
+</script>
+
+</body>
+</html>
