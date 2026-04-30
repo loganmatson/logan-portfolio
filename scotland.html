@@ -1,0 +1,907 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="Euro Trip">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<title>Scotland + London + Dublin | July 2026</title>
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;700&family=DM+Serif+Display&display=swap" rel="stylesheet">
+<style>
+:root {
+  --scotland: #2a5c45;
+  --scotland-light: #3a7d5e;
+  --highland: #6b4c8a;
+  --london: #334155;
+  --london-light: #475569;
+  --dublin: #2d6a4f;
+  --dublin-light: #40916c;
+  --ocean: #1a6b8a;
+  --bg: #f8f6f3;
+  --card: #ffffff;
+  --text: #1a1a1a;
+  --text-secondary: #5a5a5a;
+  --border: #e5e2dd;
+  --shadow: 0 2px 8px rgba(0,0,0,0.08);
+  --shadow-lift: 0 8px 24px rgba(0,0,0,0.12);
+  --radius: 14px;
+  --tab-active: var(--scotland);
+}
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg: #0f0f0f;
+    --card: #1a1a1a;
+    --text: #e8e8e8;
+    --text-secondary: #999;
+    --border: #2a2a2a;
+    --shadow: 0 2px 8px rgba(0,0,0,0.3);
+    --shadow-lift: 0 8px 24px rgba(0,0,0,0.4);
+  }
+}
+* { margin: 0; padding: 0; box-sizing: border-box; }
+body {
+  font-family: 'DM Sans', sans-serif;
+  background: var(--bg);
+  color: var(--text);
+  max-width: 480px;
+  margin: 0 auto;
+  padding-bottom: 80px;
+  -webkit-font-smoothing: antialiased;
+}
+.hero {
+  background: linear-gradient(135deg, var(--scotland) 0%, var(--highland) 35%, var(--london) 60%, var(--dublin) 85%, var(--ocean) 100%);
+  padding: 60px 20px 30px;
+  color: white;
+  position: relative;
+  overflow: hidden;
+}
+.hero::before {
+  content: '';
+  position: absolute;
+  top: -50%;
+  left: -50%;
+  width: 200%;
+  height: 200%;
+  background: radial-gradient(ellipse at 30% 50%, rgba(255,255,255,0.08) 0%, transparent 60%);
+  animation: drift 20s ease-in-out infinite;
+}
+@keyframes drift {
+  0%, 100% { transform: translate(0, 0); }
+  50% { transform: translate(30px, -20px); }
+}
+.hero h1 {
+  font-family: 'DM Serif Display', serif;
+  font-size: 28px;
+  line-height: 1.2;
+  position: relative;
+  z-index: 1;
+}
+.hero .subtitle {
+  font-size: 14px;
+  opacity: 0.85;
+  margin-top: 8px;
+  position: relative;
+  z-index: 1;
+}
+.hero .route-pills {
+  display: flex;
+  gap: 6px;
+  margin-top: 16px;
+  flex-wrap: wrap;
+  position: relative;
+  z-index: 1;
+}
+.route-pill {
+  padding: 4px 12px;
+  border-radius: 20px;
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  background: rgba(255,255,255,0.2);
+  backdrop-filter: blur(4px);
+}
+.tabs {
+  display: flex;
+  position: sticky;
+  top: 0;
+  z-index: 100;
+  background: var(--card);
+  border-bottom: 1px solid var(--border);
+  box-shadow: var(--shadow);
+}
+.tab {
+  flex: 1;
+  padding: 14px 8px;
+  text-align: center;
+  font-size: 12px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  color: var(--text-secondary);
+  border: none;
+  background: none;
+  cursor: pointer;
+  border-bottom: 3px solid transparent;
+  transition: all 0.2s ease;
+}
+.tab.active {
+  color: var(--tab-active);
+  border-bottom-color: var(--tab-active);
+}
+.tab-content { display: none; padding: 16px; }
+.tab-content.active { display: block; }
+
+/* Day Cards */
+.day-card {
+  background: var(--card);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow);
+  margin-bottom: 14px;
+  overflow: hidden;
+  transition: box-shadow 0.2s ease;
+}
+.day-card:active { box-shadow: var(--shadow-lift); }
+.day-header {
+  padding: 16px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+.day-num {
+  width: 42px;
+  height: 42px;
+  border-radius: 12px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 700;
+  font-size: 16px;
+  color: white;
+  flex-shrink: 0;
+}
+.day-header-text h3 {
+  font-family: 'DM Serif Display', serif;
+  font-size: 16px;
+  line-height: 1.3;
+}
+.day-header-text .day-date {
+  font-size: 12px;
+  color: var(--text-secondary);
+  margin-top: 2px;
+}
+.day-chevron {
+  margin-left: auto;
+  font-size: 18px;
+  color: var(--text-secondary);
+  transition: transform 0.2s ease;
+  flex-shrink: 0;
+}
+.day-card.open .day-chevron { transform: rotate(180deg); }
+.day-body {
+  display: none;
+  padding: 0 16px 16px;
+}
+.day-card.open .day-body { display: block; }
+.day-section {
+  margin-bottom: 14px;
+}
+.day-section-title {
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  color: var(--text-secondary);
+  margin-bottom: 6px;
+}
+.day-section p {
+  font-size: 14px;
+  line-height: 1.6;
+  color: var(--text);
+}
+.hike-toggle {
+  display: flex;
+  gap: 0;
+  margin: 10px 0;
+  border-radius: 8px;
+  overflow: hidden;
+  border: 1px solid var(--border);
+}
+.hike-toggle-btn {
+  flex: 1;
+  padding: 8px;
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  border: none;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  background: var(--card);
+  color: var(--text-secondary);
+}
+.hike-toggle-btn.active {
+  background: var(--scotland);
+  color: white;
+}
+.hike-option { display: none; }
+.hike-option.active { display: block; }
+.link-grid {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 8px;
+}
+.link-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 6px 12px;
+  border-radius: 20px;
+  font-size: 12px;
+  font-weight: 500;
+  text-decoration: none;
+  color: white;
+  transition: transform 0.15s ease, box-shadow 0.15s ease;
+}
+.link-pill:active {
+  transform: scale(0.96);
+}
+.link-pill.map { background: #4285f4; }
+.link-pill.trail { background: var(--scotland); }
+.link-pill.food { background: var(--dublin); }
+.link-pill.stay { background: var(--highland); }
+.link-pill.golf { background: #2d6a4f; }
+.link-pill.flight { background: var(--ocean); }
+.link-pill.book { background: #92400e; }
+.link-pill.view { background: var(--london); }
+
+/* Budget */
+.budget-card {
+  background: var(--card);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow);
+  margin-bottom: 10px;
+  overflow: hidden;
+}
+.budget-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 12px 16px;
+  border-bottom: 1px solid var(--border);
+  font-size: 14px;
+}
+.budget-row:last-child { border-bottom: none; }
+.budget-row .cat { flex: 1; }
+.budget-row .amt {
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+.budget-row .detail {
+  font-size: 11px;
+  color: var(--text-secondary);
+  margin-top: 2px;
+}
+.budget-total {
+  background: var(--scotland);
+  color: white;
+  padding: 14px 16px;
+  display: flex;
+  justify-content: space-between;
+  font-weight: 700;
+  font-size: 16px;
+}
+.budget-lever {
+  background: var(--card);
+  border-radius: var(--radius);
+  padding: 14px 16px;
+  margin-bottom: 10px;
+  box-shadow: var(--shadow);
+}
+.budget-lever h4 {
+  font-size: 13px;
+  font-weight: 700;
+  margin-bottom: 8px;
+  color: var(--dublin);
+}
+.budget-lever li {
+  font-size: 13px;
+  line-height: 1.6;
+  margin-left: 16px;
+  color: var(--text-secondary);
+}
+
+/* Packing */
+.pack-category {
+  background: var(--card);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow);
+  margin-bottom: 10px;
+  overflow: hidden;
+}
+.pack-cat-header {
+  padding: 14px 16px;
+  font-weight: 700;
+  font-size: 14px;
+  cursor: pointer;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+.pack-cat-header .count {
+  font-size: 11px;
+  color: var(--text-secondary);
+  font-weight: 500;
+}
+.pack-items { padding: 0 16px 12px; }
+.pack-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 0;
+  border-bottom: 1px solid var(--border);
+  font-size: 14px;
+  cursor: pointer;
+  transition: opacity 0.2s ease;
+}
+.pack-item:last-child { border-bottom: none; }
+.pack-check {
+  width: 22px;
+  height: 22px;
+  border-radius: 6px;
+  border: 2px solid var(--border);
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.15s ease;
+}
+.pack-item.done .pack-check {
+  background: var(--scotland);
+  border-color: var(--scotland);
+}
+.pack-item.done .pack-check::after {
+  content: '';
+  width: 6px;
+  height: 10px;
+  border: solid white;
+  border-width: 0 2px 2px 0;
+  transform: rotate(45deg) translate(-1px, -1px);
+}
+.pack-item.done .pack-label {
+  text-decoration: line-through;
+  opacity: 0.5;
+}
+
+/* Info Tab */
+.info-section {
+  background: var(--card);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow);
+  margin-bottom: 14px;
+  overflow: hidden;
+}
+.info-section-header {
+  padding: 14px 16px;
+  font-family: 'DM Serif Display', serif;
+  font-size: 16px;
+  border-bottom: 1px solid var(--border);
+}
+.info-row {
+  padding: 10px 16px;
+  border-bottom: 1px solid var(--border);
+  font-size: 13px;
+  line-height: 1.5;
+}
+.info-row:last-child { border-bottom: none; }
+.info-row strong { font-weight: 700; }
+.info-row a {
+  color: var(--ocean);
+  text-decoration: none;
+  font-weight: 500;
+}
+.currency-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13px;
+  font-variant-numeric: tabular-nums;
+}
+.currency-table th {
+  text-align: left;
+  padding: 8px 16px;
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  color: var(--text-secondary);
+  border-bottom: 1px solid var(--border);
+}
+.currency-table td {
+  padding: 8px 16px;
+  border-bottom: 1px solid var(--border);
+}
+.food-card {
+  padding: 12px 16px;
+  border-bottom: 1px solid var(--border);
+}
+.food-card:last-child { border-bottom: none; }
+.food-card .dish { font-weight: 700; font-size: 14px; }
+.food-card .desc { font-size: 12px; color: var(--text-secondary); margin-top: 2px; }
+.weather-bar {
+  display: flex;
+  gap: 8px;
+  padding: 12px 16px;
+}
+.weather-item {
+  flex: 1;
+  text-align: center;
+  padding: 10px 6px;
+  border-radius: 10px;
+  background: var(--bg);
+}
+.weather-item .temp {
+  font-weight: 700;
+  font-size: 16px;
+  margin-bottom: 2px;
+}
+.weather-item .loc {
+  font-size: 10px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  color: var(--text-secondary);
+}
+.weather-item .cond {
+  font-size: 10px;
+  color: var(--text-secondary);
+  margin-top: 2px;
+}
+footer {
+  text-align: center;
+  padding: 20px;
+  font-size: 11px;
+  color: var(--text-secondary);
+}
+</style>
+</head>
+<body>
+
+<div class="hero">
+  <h1>Scotland, London & Dublin</h1>
+  <div class="subtitle">July 20 - 28, 2026 &middot; 9 Days &middot; 2 Travelers</div>
+  <div class="route-pills">
+    <span class="route-pill">Edinburgh</span>
+    <span class="route-pill">Glen Coe</span>
+    <span class="route-pill">St. Andrews</span>
+    <span class="route-pill">London</span>
+    <span class="route-pill">Dublin</span>
+  </div>
+</div>
+
+<div class="tabs">
+  <button class="tab active" onclick="switchTab('itinerary')">Itinerary</button>
+  <button class="tab" onclick="switchTab('budget')">Budget</button>
+  <button class="tab" onclick="switchTab('packing')">Packing</button>
+  <button class="tab" onclick="switchTab('info')">Info</button>
+</div>
+
+<div id="itinerary" class="tab-content active"></div>
+<div id="budget" class="tab-content"></div>
+<div id="packing" class="tab-content"></div>
+<div id="info" class="tab-content"></div>
+
+<footer>Built by Bob the Builder &middot; March 2026</footer>
+
+<script>
+// ============================================================
+// DATA
+// ============================================================
+const DAYS = [
+  {
+    num: 1, date: 'Mon Jul 20', title: 'Arrive Edinburgh',
+    phase: 'scotland',
+    action: 'United nonstop lands 8:05am. Do NOT nap — push through the jet lag. Check into Airbnb in Leith or Portobello (~$150-200/night for 2). Climb Arthur\'s Seat (2.8-mile loop, 820ft gain, extinct volcanic summit — views over all of Edinburgh). Walk the Royal Mile from Edinburgh Castle down to Holyrood Palace. Explore Grassmarket. Early dinner, then crash.',
+    evening: 'Dinner at Oink on Victoria Street (legendary pulled pork rolls, ~$7) or Mums Great Comfort Food on Forrest Road (~$14/plate). Walk up Calton Hill for sunset views.',
+    links: [
+      { label: 'Arthur\'s Seat', url: 'https://www.alltrails.com/trail/scotland/edinburgh/arthurs-seat', type: 'trail' },
+      { label: 'Royal Mile', url: 'https://www.google.com/maps/place/Royal+Mile,+Edinburgh,+UK', type: 'map' },
+      { label: 'Edinburgh Castle', url: 'https://www.google.com/maps/place/Edinburgh+Castle', type: 'map' },
+      { label: 'Calton Hill', url: 'https://www.google.com/maps/place/Calton+Hill,+Edinburgh,+UK', type: 'map' },
+      { label: 'Oink', url: 'https://www.oinkhogroast.co.uk/shops/victoria-street/', type: 'food' },
+      { label: 'Airbnb Edinburgh', url: 'https://www.airbnb.com/edinburgh-scotland/stays', type: 'stay' }
+    ]
+  },
+  {
+    num: 2, date: 'Tue Jul 21', title: 'Edinburgh → Glen Coe',
+    phase: 'scotland',
+    action: 'Pick up rental car at Edinburgh Airport. Drive to Glen Coe (3.5 hrs via Stirling — stop for a photo at the Wallace Monument on the way). Morning golf at Woodlands Golf Course (~$45/pp + bag rental — mountain backdrop is unreal). Afternoon: hike the Lost Valley (Coire Gabhail) between the Three Sisters if legs are willing.',
+    evening: 'Drive to Fort William (30 min). Check into Airbnb cottage/pod (~$175-225/night, split between 2). Cook pasta. Carb-load for tomorrow. You will need it.',
+    hike: {
+      hard: { title: 'Bidean nam Bian Summit', desc: 'Full summit (3,773ft). 7.1 miles, 4,140ft gain, 7-8 hours. Exposed scrambling, navigation required, serious mountain.', links: [
+        { label: 'AllTrails', url: 'https://www.alltrails.com/trail/scotland/highlands/bidean-nam-bian-via-the-lost-valley', type: 'trail' },
+        { label: 'Walkhighlands', url: 'https://www.walkhighlands.co.uk/fortwilliam/bideannambian.shtml', type: 'trail' }
+      ]},
+      alt: { title: 'Lost Valley Out-and-Back', desc: '2.5 miles, steep but manageable, 2-3 hours. Hidden valley between the Three Sisters. Great warm-up before Ben Nevis.', links: [
+        { label: 'AllTrails', url: 'https://www.alltrails.com/trail/scotland/highlands/lost-valley-coire-gabhail', type: 'trail' }
+      ]}
+    },
+    links: [
+      { label: 'Glen Coe', url: 'https://www.google.com/maps/place/Glen+Coe,+Ballachulish', type: 'map' },
+      { label: 'Woodlands Golf', url: 'https://www.google.com/maps/place/Woodlands+Golf+Course,+Glencoe', type: 'golf' },
+      { label: 'Wallace Monument', url: 'https://www.google.com/maps/place/The+National+Wallace+Monument', type: 'map' },
+      { label: 'KAYAK Car Rental', url: 'https://www.kayak.com/Budget-Car-Rentals-Edinburgh.ABUDGET.29671.cl.ksp', type: 'book' },
+      { label: 'Airbnb Fort William', url: 'https://www.airbnb.com/fort-william-united-kingdom/stays', type: 'stay' }
+    ]
+  },
+  {
+    num: 3, date: 'Wed Jul 22', title: 'Ben Nevis',
+    phase: 'scotland',
+    action: 'The main event. Highest peak in the British Isles. 4,413ft. Start by 7am from the North Face Car Park. Weather check mandatory the night before — summit can be 0°C and whiteout in July.',
+    evening: 'You will be destroyed. Recovery dinner at The Wildcat (vegan cafe, ~$14) or The Grog & Gruel (~$15 pub food). Same Airbnb. Stretch. Sleep.',
+    hike: {
+      hard: { title: 'CMD Arete', desc: 'The mountaineer\'s route. Knife-edge ridge at 4,000ft. 11.6 miles, 4,900ft gain, 8-10 hours. Grade 1 scramble. Bring waterproofs, layers, headtorch, extra food.', links: [
+        { label: 'AllTrails', url: 'https://www.alltrails.com/en-gb/trail/scotland/highlands/ben-nevis-via-carn-mor-dearg-arete', type: 'trail' },
+        { label: 'Walkhighlands', url: 'https://www.walkhighlands.co.uk/fortwilliam/carnmordeargarete.shtml', type: 'trail' }
+      ]},
+      alt: { title: 'Mountain Track', desc: 'Still a full-day beast. 10.2 miles, 4,400ft gain, 7-8 hours. No scrambling but relentless. Do not underestimate.', links: [
+        { label: 'AllTrails', url: 'https://www.alltrails.com/trail/scotland/highlands/ben-nevis-mountain-path', type: 'trail' },
+        { label: 'Walkhighlands', url: 'https://www.walkhighlands.co.uk/fortwilliam/bennevis.shtml', type: 'trail' }
+      ]}
+    },
+    links: [
+      { label: 'North Face Car Park', url: 'https://www.google.com/maps/place/North+Face+Car+Park,+Fort+William', type: 'map' },
+      { label: 'The Wildcat', url: 'https://www.tripadvisor.com/Restaurant_Review-g186545-d13430328-Reviews-The_Wildcat-Fort_William_Lochaber_Scottish_Highlands_Scotland.html', type: 'food' }
+    ]
+  },
+  {
+    num: 4, date: 'Thu Jul 23', title: 'St. Andrews + Edinburgh',
+    phase: 'scotland',
+    action: 'Drive from Fort William to St. Andrews (~2.5 hrs). Morning round at Strathtyrum Course or Balgrove Course (both public, ~$55-100/pp + rental). Walk the Old Course, Swilcan Bridge, and the town. Browse Golf Museum if interested (~$12). Drive to Edinburgh (~1.5 hrs). Return rental car at Edinburgh Airport.',
+    evening: 'Check into Edinburgh Airbnb (~$150-180/night). Dinner on the Royal Mile — The Dogs or Whiski Bar. Early night — 6:30am flight tomorrow.',
+    links: [
+      { label: 'St. Andrews Links', url: 'https://www.standrews.com/play/courses', type: 'golf' },
+      { label: 'Old Course', url: 'https://www.google.com/maps/place/Old+Course+at+St+Andrews', type: 'map' },
+      { label: 'Golf Museum', url: 'https://www.britishgolfmuseum.co.uk/', type: 'book' },
+      { label: 'Edinburgh Airport', url: 'https://www.google.com/maps/place/Edinburgh+Airport', type: 'map' },
+      { label: 'Airbnb Edinburgh', url: 'https://www.airbnb.com/s/Edinburgh--UK/homes', type: 'stay' }
+    ]
+  },
+  {
+    num: 5, date: 'Fri Jul 24', title: 'Edinburgh → London',
+    phase: 'london',
+    action: 'Early alarm. Flight departs Edinburgh 6:30am, arrives London 7:55am. Bus or tube to central London. Check into Airbnb in Southwark or Shoreditch (~$175-225/night, 2 nights).',
+    evening: 'Walk the South Bank: Tower Bridge to Westminster along the Thames. Borough Market for lunch (~$12-15). Tate Modern (free). Cross Millennium Bridge. Explore Shoreditch. Dinner at Flat Iron (~$17 steak, absurd value) or Som Saa (Thai, ~$18 mains).',
+    links: [
+      { label: 'Edinburgh Airport', url: 'https://www.google.com/maps/place/Edinburgh+Airport', type: 'map' },
+      { label: 'South Bank', url: 'https://www.google.com/maps/place/South+Bank,+London,+UK', type: 'map' },
+      { label: 'Borough Market', url: 'https://www.google.com/maps/place/Borough+Market,+London,+UK', type: 'map' },
+      { label: 'Tate Modern', url: 'https://www.google.com/maps/place/Tate+Modern,+London,+UK', type: 'map' },
+      { label: 'Airbnb London', url: 'https://www.airbnb.com/s/Shoreditch--London--UK/homes', type: 'stay' }
+    ]
+  },
+  {
+    num: 6, date: 'Sat Jul 25', title: 'London Full Day',
+    phase: 'london',
+    action: 'Morning: Hike Hampstead Heath to Parliament Hill (7.4km, 2-2.5 hrs, panoramic views). Walk through Camden to Regent\'s Park and up Primrose Hill (best free viewpoint in London). Afternoon: British Museum (free), Sky Garden (free — BOOK IN ADVANCE at skygarden.london), cross Millennium Bridge, explore Shoreditch street art.',
+    evening: 'Chinatown for Wong Kei (~$15-18 mains, legendary no-frills Cantonese). Or Flat Iron if you missed it yesterday. Walk the South Bank lit up at night.',
+    links: [
+      { label: 'Hampstead Heath', url: 'https://www.alltrails.com/en-gb/trail/england/london/hampstead-heath-circular-walk', type: 'trail' },
+      { label: 'Parliament Hill', url: 'https://www.google.com/maps/place/Parliament+Hill,+London,+UK', type: 'map' },
+      { label: 'Primrose Hill', url: 'https://www.google.com/maps/place/Primrose+Hill,+London,+UK', type: 'map' },
+      { label: 'Sky Garden (FREE)', url: 'https://skygarden.london/booking/book-a-free-ticket/', type: 'book' },
+      { label: 'British Museum', url: 'https://www.google.com/maps/place/British+Museum,+London,+UK', type: 'map' },
+      { label: 'Wong Kei', url: 'https://wongkeilondon.com/', type: 'food' }
+    ]
+  },
+  {
+    num: 7, date: 'Sun Jul 26', title: 'London → Dublin',
+    phase: 'dublin',
+    action: 'Early alarm. Flight departs London 6:35am, arrives Dublin 7:55am. Check into Airbnb in Temple Bar or Portobello (~$120-160/night, 2 nights split between 2). Afternoon: Ha\'penny Bridge, Trinity College + Book of Kells (~$16/pp, book ahead), walk Grafton Street and St. Stephen\'s Green.',
+    evening: 'Dinner at The Winding Stair (Irish modern, ~$25 mains, riverside) or Fade Street Social (~$18-22). Walk along the Liffey at night.',
+    links: [
+      { label: 'Dublin Airport', url: 'https://www.google.com/maps/place/Dublin+Airport', type: 'map' },
+      { label: 'Ha\'penny Bridge', url: 'https://www.google.com/maps/place/Ha%27penny+Bridge,+Dublin,+Ireland', type: 'map' },
+      { label: 'Trinity College', url: 'https://www.google.com/maps/place/Trinity+College+Dublin', type: 'map' },
+      { label: 'Book of Kells', url: 'https://www.tcd.ie/visitors/book-of-kells/', type: 'book' },
+      { label: 'Airbnb Dublin', url: 'https://www.airbnb.com/s/Dublin--Ireland/homes', type: 'stay' }
+    ]
+  },
+  {
+    num: 8, date: 'Mon Jul 27', title: 'Dublin Full Day',
+    phase: 'dublin',
+    action: 'Morning: Take the DART (~$4) to Howth and do the Howth Cliff Walk (6mi coastal loop, stunning cliffs + sea views, free, ~2.5 hrs). Seafood chowder or fish & chips at Howth Harbour after. Return to Dublin. Afternoon: Kilmainham Gaol tour (~$10/pp, book ahead — visceral Irish history) + Phoenix Park (free, 1,750 acres, bigger than Central Park).',
+    evening: 'Walk Portobello neighbourhood. Dinner at Forest & Marcy (~$20-25 mains, neighbourhood gem) or Dax (~$25 French-Irish). Try a soda bread sandwich at Bretzel Bakery if open.',
+    links: [
+      { label: 'Howth Cliff Walk', url: 'https://www.alltrails.com/trail/ireland/county-dublin/howth-cliff-path-loop', type: 'trail' },
+      { label: 'Howth DART', url: 'https://www.google.com/maps/place/Howth+DART+Station', type: 'map' },
+      { label: 'Kilmainham Gaol', url: 'https://kilmainhamgaolmuseum.ie/', type: 'book' },
+      { label: 'Phoenix Park', url: 'https://www.google.com/maps/place/Phoenix+Park,+Dublin,+Ireland', type: 'map' }
+    ]
+  },
+  {
+    num: 9, date: 'Tue Jul 28', title: 'Dublin → NYC',
+    phase: 'dublin',
+    action: 'Last morning. Walk St. Stephen\'s Green or Merrion Square. Guinness Storehouse (~$28/pp) if you have time before the airport — book online for cheaper. US Customs pre-clearance happens at Dublin Airport (you clear US customs before boarding — arrive 3 hrs early). DUB→JFK is ~7 hrs. Land in New York having already cleared customs.',
+    evening: '',
+    links: [
+      { label: 'St. Stephen\'s Green', url: 'https://www.google.com/maps/place/St.+Stephen\'s+Green,+Dublin,+Ireland', type: 'map' },
+      { label: 'Guinness Storehouse', url: 'https://www.guinness-storehouse.com/en/tickets', type: 'book' },
+      { label: 'Dublin Airport', url: 'https://www.google.com/maps/place/Dublin+Airport', type: 'map' },
+      { label: 'Google Flights', url: 'https://www.google.com/travel/flights', type: 'flight' }
+    ]
+  }
+];
+
+const BUDGET = [
+  { cat: 'Flights JFK→EDI + DUB→NYC', total: 1450, pp: 725, detail: 'Actual booked price, both legs' },
+  { cat: 'Flight EDI→London (Jul 24)', total: 100, pp: 50, detail: '~€45/pp, 6:30am departs Edinburgh' },
+  { cat: 'Flight London→Dublin (Jul 26)', total: 100, pp: 50, detail: '~€45/pp, 6:35am departs London' },
+  { cat: 'Car Rental (3 days, EDI)', total: 150, pp: 75, detail: 'Economy, Edinburgh Airport, split between 2' },
+  { cat: 'Gas', total: 80, pp: 40, detail: '~500 miles Edinburgh → Glen Coe → St. Andrews' },
+  { cat: 'Golf (2 rounds + rentals)', total: 300, pp: 150, detail: 'Woodlands ~$65/pp + St. Andrews ~$85/pp' },
+  { cat: 'Airbnb Edinburgh (2 nights)', total: 340, pp: 170, detail: 'Leith/Portobello, split' },
+  { cat: 'Airbnb Fort William (2 nights)', total: 400, pp: 200, detail: 'Cottage/pod, split' },
+  { cat: 'Airbnb London (2 nights)', total: 400, pp: 200, detail: 'Southwark/Shoreditch, split' },
+  { cat: 'Airbnb Dublin (2 nights)', total: 280, pp: 140, detail: 'Temple Bar/Portobello, split' },
+  { cat: 'Food (9 days)', total: 900, pp: 450, detail: '~$50/pp/day, cook-in + restaurants' },
+  { cat: 'Activities & Tickets', total: 200, pp: 100, detail: 'Book of Kells, Kilmainham, Sky Garden, etc.' },
+  { cat: 'London Transport', total: 80, pp: 40, detail: 'Oyster card x2, 2 days' },
+  { cat: 'Dublin Transport', total: 60, pp: 30, detail: 'DART to Howth + bus' },
+  { cat: 'Contingency', total: 300, pp: 150, detail: 'Buffer for overruns' }
+];
+
+const PACKING = {
+  'Clothing': ['Waterproof hiking jacket (essential — Scotland + Dublin both get rain)', 'Waterproof trousers', 'Fleece midlayer', 'Merino base layer (top + bottom)', '3x moisture-wicking t-shirts', '2x hiking pants (quick-dry)', '1x casual pants for cities', '1x shorts (London/Dublin if warm)', 'Warm hat + gloves (Ben Nevis summit)', '5x socks (2 hiking wool, 3 regular)', '5x underwear'],
+  'Footwear': ['Waterproof hiking boots (broken in)', 'Lightweight shoes for cities', 'Flip flops or sandals'],
+  'Gear': ['30-40L daypack', 'Headtorch + spare batteries', 'Reusable water bottle (1L)', 'Trekking poles (optional, very helpful on Ben Nevis)', 'Dry bag / stuff sack for rain', 'Sunglasses', 'Sunscreen SPF50'],
+  'Documents': ['Passport (US, valid 6+ months)', 'Printed flight confirmations (all 4 flights)', 'Car rental confirmation', 'Travel insurance docs', 'No-fee credit card (Chase Sapphire / Capital One)', 'Debit card for ATM cash', 'UK driving license translation (US license accepted in UK/Ireland)'],
+  'Electronics': ['Phone + charger', 'UK plug adapter (Type G, 3-pin — works in UK AND Ireland)', 'Portable battery pack', 'Offline maps downloaded (Google Maps / AllTrails)'],
+  'Toiletries': ['Toothbrush + paste', 'Deodorant', 'Shampoo/body wash (travel size)', 'Medications (if any)', 'Blister plasters (Compeed)', 'Basic first aid (bandages, ibuprofen)']
+};
+
+const EMERGENCY = [
+  { region: 'UK (Scotland + London)', number: '999', embassy: 'US Embassy London: +44 20 7499 9000', hospital: 'Belford Hospital, Fort William: +44 1397 702481 | St Thomas\' Hospital, London: +44 20 7188 7188' },
+  { region: 'Ireland (Dublin)', number: '112 or 999', embassy: 'US Embassy Dublin: +353 1 668 8777', hospital: 'St James\'s Hospital, Dublin: +353 1 410 3000 | Beaumont Hospital: +353 1 809 3000' }
+];
+
+const FOODS = {
+  'Scotland': [
+    { dish: 'Haggis', desc: 'Spiced offal pudding with neeps (turnips) + tatties (potatoes). Try it once.' },
+    { dish: 'Cullen Skink', desc: 'Thick smoked haddock + potato soup. Perfect after a Highlands hike.' },
+    { dish: 'Fish & Chips', desc: 'The real deal. Anstruther Fish Bar on the Fife coast or any Edinburgh chippy.' },
+    { dish: 'Tablet', desc: 'Scottish fudge on steroids. Crumbly, sweet, addictive. Grab from any bakery.' },
+    { dish: 'Irn-Bru', desc: 'Scotland\'s "other national drink." Bright orange, tastes like nothing else on Earth.' }
+  ],
+  'London': [
+    { dish: 'Full English Breakfast', desc: 'Eggs, bacon, sausage, beans, toast, tomato, black pudding. Fuel for the day.' },
+    { dish: 'Pie & Mash', desc: 'East London classic. Steak pie with mashed potatoes and liquor (parsley sauce).' },
+    { dish: 'Sunday Roast', desc: 'If you\'re there Saturday: some pubs do it early. Beef, Yorkshire pudding, gravy.' }
+  ],
+  'Dublin': [
+    { dish: 'Full Irish Breakfast', desc: 'Rashers, sausages, black + white pudding, eggs, soda bread. The Fumbally or Bewley\'s on Grafton St.' },
+    { dish: 'Seafood Chowder', desc: 'Howth Harbour after the cliff walk. Thick, creamy, with soda bread. Any pier stall.' },
+    { dish: 'Soda Bread', desc: 'Dense, tangy, eaten with everything. Bretzel Bakery in Portobello has the best in the city.' },
+    { dish: 'Fish & Chips', desc: 'Beshoff Bros on O\'Connell Street — the definitive Dublin chippy since 1913.' }
+  ]
+};
+
+// ============================================================
+// RENDER
+// ============================================================
+const phaseColors = { scotland: 'var(--scotland)', london: 'var(--london)', dublin: 'var(--dublin)' };
+
+function renderDays() {
+  const el = document.getElementById('itinerary');
+  el.innerHTML = DAYS.map(d => {
+    const hikeHtml = d.hike ? `
+      <div class="day-section">
+        <div class="day-section-title">Hike Options</div>
+        <div class="hike-toggle">
+          <button class="hike-toggle-btn active" onclick="event.stopPropagation(); toggleHike(this, ${d.num}, 'hard')">Hard</button>
+          <button class="hike-toggle-btn" onclick="event.stopPropagation(); toggleHike(this, ${d.num}, 'alt')">Alternative</button>
+        </div>
+        <div class="hike-option active" id="hike-${d.num}-hard">
+          <p><strong>${d.hike.hard.title}</strong><br>${d.hike.hard.desc}</p>
+          <div class="link-grid">${d.hike.hard.links.map(l => `<a class="link-pill ${l.type}" href="${l.url}" target="_blank">${l.label}</a>`).join('')}</div>
+        </div>
+        <div class="hike-option" id="hike-${d.num}-alt">
+          <p><strong>${d.hike.alt.title}</strong><br>${d.hike.alt.desc}</p>
+          <div class="link-grid">${d.hike.alt.links.map(l => `<a class="link-pill ${l.type}" href="${l.url}" target="_blank">${l.label}</a>`).join('')}</div>
+        </div>
+      </div>
+    ` : '';
+    const eveningHtml = d.evening ? `<div class="day-section"><div class="day-section-title">Evening</div><p>${d.evening}</p></div>` : '';
+    return `
+      <div class="day-card" onclick="toggleDay(this)">
+        <div class="day-header">
+          <div class="day-num" style="background:${phaseColors[d.phase]}">${d.num}</div>
+          <div class="day-header-text">
+            <h3>${d.title}</h3>
+            <div class="day-date">${d.date}, 2026</div>
+          </div>
+          <div class="day-chevron">&#9662;</div>
+        </div>
+        <div class="day-body">
+          <div class="day-section"><div class="day-section-title">The Action</div><p>${d.action}</p></div>
+          ${hikeHtml}
+          ${eveningHtml}
+          <div class="day-section">
+            <div class="day-section-title">Quick Links</div>
+            <div class="link-grid">${d.links.map(l => `<a class="link-pill ${l.type}" href="${l.url}" target="_blank">${l.label}</a>`).join('')}</div>
+          </div>
+        </div>
+      </div>
+    `;
+  }).join('');
+}
+
+function renderBudget() {
+  const el = document.getElementById('budget');
+  const totalAll = BUDGET.reduce((s, b) => s + b.total, 0);
+  const totalPP = BUDGET.reduce((s, b) => s + b.pp, 0);
+  el.innerHTML = `
+    <div style="margin-bottom:10px;font-family:'DM Serif Display',serif;font-size:20px;">Budget Breakdown</div>
+    <div style="font-size:13px;color:var(--text-secondary);margin-bottom:14px;">~$2,530/person &middot; ~$5,060 total for 2</div>
+    <div class="budget-card">
+      ${BUDGET.map(b => `
+        <div class="budget-row">
+          <div class="cat">${b.cat}<div class="detail">${b.detail}</div></div>
+          <div class="amt">$${b.pp}</div>
+        </div>
+      `).join('')}
+      <div class="budget-total">
+        <span>Total per person</span>
+        <span>$${totalPP.toLocaleString()}</span>
+      </div>
+    </div>
+    <div class="budget-lever">
+      <h4>$${totalPP - 2500 > 0 ? totalPP - 2500 : 0} Over Target &mdash; How to Trim</h4>
+      <ol>
+        <li>Book flights NOW (4+ months out saves $50-100/pp)</li>
+        <li>Cook 50%+ of meals in Airbnbs (save $50-75/pp)</li>
+        <li>Pack carry-on only for Ryanair flights (save $35-65/pp in bag fees)</li>
+        <li>Choose cheaper Airbnb neighborhoods (save $25-50/pp)</li>
+        <li>Fly Ryanair on Tue/Wed for lowest fares</li>
+      </ol>
+    </div>
+  `;
+}
+
+function renderPacking() {
+  const el = document.getElementById('packing');
+  el.innerHTML = `
+    <div style="margin-bottom:10px;font-family:'DM Serif Display',serif;font-size:20px;">Packing List</div>
+    <div style="font-size:13px;color:var(--text-secondary);margin-bottom:14px;">Tap items to check them off. Progress saves automatically.</div>
+    ${Object.entries(PACKING).map(([cat, items]) => {
+      const checked = items.filter((_, i) => localStorage.getItem(`pack-${cat}-${i}`) === '1').length;
+      return `
+        <div class="pack-category">
+          <div class="pack-cat-header" onclick="this.nextElementSibling.hidden = !this.nextElementSibling.hidden">
+            ${cat} <span class="count">${checked}/${items.length}</span>
+          </div>
+          <div class="pack-items">
+            ${items.map((item, i) => {
+              const done = localStorage.getItem(`pack-${cat}-${i}`) === '1';
+              return `<div class="pack-item ${done ? 'done' : ''}" onclick="togglePack(this, '${cat}', ${i})">
+                <div class="pack-check"></div>
+                <span class="pack-label">${item}</span>
+              </div>`;
+            }).join('')}
+          </div>
+        </div>
+      `;
+    }).join('')}
+  `;
+}
+
+function renderInfo() {
+  const el = document.getElementById('info');
+  el.innerHTML = `
+    <div style="margin-bottom:14px;font-family:'DM Serif Display',serif;font-size:20px;">Trip Info</div>
+
+    <div class="info-section">
+      <div class="info-section-header">Weather (July)</div>
+      <div class="weather-bar">
+        <div class="weather-item"><div class="temp">12-18C</div><div class="loc">Scotland</div><div class="cond">Rain likely, 17+ hr daylight</div></div>
+        <div class="weather-item"><div class="temp">18-25C</div><div class="loc">London</div><div class="cond">Occasional rain</div></div>
+        <div class="weather-item"><div class="temp">14-20C</div><div class="loc">Dublin</div><div class="cond">Partly cloudy, rain likely</div></div>
+      </div>
+    </div>
+
+    <div class="info-section">
+      <div class="info-section-header">Currency Reference</div>
+      <table class="currency-table">
+        <tr><th>USD</th><th>GBP (UK)</th><th>EUR (Dublin)</th></tr>
+        <tr><td>$5</td><td>&pound;3.95</td><td>&euro;4.60</td></tr>
+        <tr><td>$10</td><td>&pound;7.90</td><td>&euro;9.20</td></tr>
+        <tr><td>$20</td><td>&pound;15.80</td><td>&euro;18.40</td></tr>
+        <tr><td>$50</td><td>&pound;39.50</td><td>&euro;46.00</td></tr>
+        <tr><td>$100</td><td>&pound;79.00</td><td>&euro;92.00</td></tr>
+      </table>
+    </div>
+
+    <div class="info-section">
+      <div class="info-section-header">Emergency Contacts</div>
+      ${EMERGENCY.map(e => `
+        <div class="info-row">
+          <strong>${e.region}</strong><br>
+          Emergency: <strong>${e.number}</strong><br>
+          ${e.embassy}<br>
+          <span style="font-size:12px;color:var(--text-secondary)">${e.hospital}</span>
+        </div>
+      `).join('')}
+    </div>
+
+    <div class="info-section">
+      <div class="info-section-header">Don't Miss: Local Food</div>
+      ${Object.entries(FOODS).map(([region, dishes]) => `
+        <div class="info-row" style="font-weight:700;background:var(--bg)">${region}</div>
+        ${dishes.map(f => `<div class="food-card"><div class="dish">${f.dish}</div><div class="desc">${f.desc}</div></div>`).join('')}
+      `).join('')}
+    </div>
+
+    <div class="info-section">
+      <div class="info-section-header">Logistics</div>
+      <div class="info-row"><strong>Flights:</strong> JFK→EDI (United nonstop, Jul 19 8:10pm) + DUB→NYC (Jul 28). Booked: $1,450 total both legs.</div>
+      <div class="info-row"><strong>EDI→London:</strong> Departs Edinburgh 6:30am, arrives 7:55am, Jul 24. ~€45/pp Ryanair/EasyJet. Personal bag only (40x20x25cm) is free.</div>
+      <div class="info-row"><strong>London→Dublin:</strong> Departs London 6:35am, arrives Dublin 7:55am, Jul 26. ~€45/pp. Personal bag only.</div>
+      <div class="info-row"><strong>Car Rental:</strong> 3 days from <a href="https://www.kayak.com/Budget-Car-Rentals-Edinburgh.ABUDGET.29671.cl.ksp" target="_blank">Edinburgh Airport</a>. ~$35-55/day. DRIVE ON THE LEFT (same in Ireland).</div>
+      <div class="info-row"><strong>London Transport:</strong> <a href="https://tfl.gov.uk/fares/how-to-pay-and-where-to-buy-tickets-and-oyster/pay-as-you-go/oyster-pay-as-you-go" target="_blank">Oyster card</a> or contactless. Daily cap ~$10 Zones 1-2.</div>
+      <div class="info-row"><strong>Dublin Transport:</strong> DART train (~$4) to Howth. Luas tram + buses for city. Dublin Bikes (~$2/day) if you want to explore fast.</div>
+      <div class="info-row"><strong>Dublin Airport:</strong> US Customs pre-clearance on departure — arrive 3 hours early. You clear US customs before boarding.</div>
+      <div class="info-row"><strong>Passports:</strong> US passport. No visa for UK or Ireland. Both 90-day entries, no stamp needed between UK→IE.</div>
+      <div class="info-row"><strong>Cards:</strong> Use a no-foreign-transaction-fee card (Chase Sapphire, Capital One Venture). GBP in UK, EUR in Dublin.</div>
+    </div>
+  `;
+}
+
+// ============================================================
+// INTERACTIONS
+// ============================================================
+function switchTab(id) {
+  document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+  document.querySelectorAll('.tab-content').forEach(t => t.classList.remove('active'));
+  document.getElementById(id).classList.add('active');
+  const tabs = ['itinerary','budget','packing','info'];
+  document.querySelectorAll('.tab')[tabs.indexOf(id)].classList.add('active');
+  const colors = { itinerary: 'var(--scotland)', budget: 'var(--scotland)', packing: 'var(--highland)', info: 'var(--ocean)' };
+  document.documentElement.style.setProperty('--tab-active', colors[id]);
+}
+
+function toggleDay(card) {
+  if (event.target.closest('.link-pill') || event.target.closest('.hike-toggle-btn')) return;
+  card.classList.toggle('open');
+}
+
+function toggleHike(btn, dayNum, mode) {
+  const parent = btn.closest('.day-section');
+  parent.querySelectorAll('.hike-toggle-btn').forEach(b => b.classList.remove('active'));
+  btn.classList.add('active');
+  parent.querySelectorAll('.hike-option').forEach(o => o.classList.remove('active'));
+  document.getElementById(`hike-${dayNum}-${mode}`).classList.add('active');
+}
+
+function togglePack(item, cat, idx) {
+  item.classList.toggle('done');
+  const isDone = item.classList.contains('done') ? '1' : '0';
+  localStorage.setItem(`pack-${cat}-${idx}`, isDone);
+  // Update count
+  const catEl = item.closest('.pack-category');
+  const items = catEl.querySelectorAll('.pack-item');
+  const checked = catEl.querySelectorAll('.pack-item.done').length;
+  catEl.querySelector('.count').textContent = `${checked}/${items.length}`;
+}
+
+// ============================================================
+// INIT
+// ============================================================
+document.addEventListener('DOMContentLoaded', () => {
+  renderDays();
+  renderBudget();
+  renderPacking();
+  renderInfo();
+});
+</script>
+</body>
+</html>

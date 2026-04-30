@@ -1,0 +1,3760 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Pittsburgh Marathon — Race Execution Plan / Logan Matson</title>
+<style>
+  /* ============================================================
+     DESIGN TOKENS — Topographic / Cartographic
+     Pittsburgh black & gold + zone gradient
+     ============================================================ */
+  :root {
+    --ink: #0A0E13;
+    --ink-2: #101820;
+    --ink-3: #161E28;
+    --ink-4: #1E2733;
+    --paper: #F4EFE6;          /* aged map paper for print/wristband */
+    --paper-2: #E8E1D4;
+    --gold: #FFB612;            /* Steelers gold */
+    --gold-dim: #C68C0E;
+    --gold-deep: #8B6308;
+    --bone: #E8DFC9;
+    --rule: rgba(255,182,18,0.18);
+    --rule-soft: rgba(255,182,18,0.08);
+    --grid: rgba(255,182,18,0.05);
+    --text: #E8DFC9;
+    --text-dim: #9A8E73;
+    --text-faint: #5A5440;
+
+    /* Zone palette — cool early → red crucible → gold finish */
+    --z1: #4A6FA5;   /* Z1 cool blue — settle */
+    --z2: #5B8CB8;   /* Z2 lighter blue — cruise */
+    --z3: #7FA68C;   /* Z3 sage — north shore */
+    --z4: #C9A14A;   /* Z4 amber — approach */
+    --z5: #D9501F;   /* Z5 burnt orange — THE HILL */
+    --z6: #B8401C;   /* Z6 deep red — grind */
+    --z7: #FFB612;   /* Z7 gold — finish */
+
+    --mono: ui-monospace, 'SFMono-Regular', 'Menlo', 'Consolas', monospace;
+    --serif: 'Cormorant Garamond', 'Iowan Old Style', 'Palatino Linotype', 'Palatino', 'Georgia', serif;
+    --sans: -apple-system, BlinkMacSystemFont, 'Helvetica Neue', Arial, sans-serif;
+
+    /* Active zone color — single source of truth for topo lines + pulse */
+    --active-zone: #4A6FA5;
+    --pulse-color: transparent;
+  }
+
+  /* ------------------------------------------------------------
+     Cormorant Garamond — loaded from Google Fonts.
+     OFFLINE TRADEOFF: a true offline embed would require ~180 KB
+     of base64 WOFF2 inline (300/400/600/600i). Logan reads this
+     night-before on home wifi and on phone race-morning where
+     these are already cached by other apps. Keeping the file
+     readable beats a 200 KB binary blob in the source.
+     ------------------------------------------------------------ */
+  @import url('https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,300;0,400;0,500;0,600;1,400&display=swap');
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  html, body {
+    background: var(--ink);
+    color: var(--text);
+    font-family: var(--sans);
+    font-size: 16px;
+    line-height: 1.5;
+    -webkit-font-smoothing: antialiased;
+    overflow-x: hidden;
+  }
+
+  /* Parallax topo SVG canvas — full-viewport fixed, behind content */
+  #topo-bg {
+    position: fixed;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    z-index: 0;
+    pointer-events: none;
+    will-change: transform;
+  }
+  #topo-bg path,
+  #topo-bg .contour {
+    stroke: var(--active-zone);
+    fill: none;
+    transition: stroke 1.2s ease, opacity 1.2s ease;
+  }
+
+  /* Section-aware radial pulse — sits between topo and content */
+  #bg-pulse {
+    position: fixed;
+    inset: 0;
+    z-index: 0;
+    pointer-events: none;
+    background: var(--pulse-color);
+    transition: background 1.8s ease;
+  }
+
+  /* ------------------------------------------------------------
+     SECTION BACKGROUND IMAGE STACK
+     One <div.scene> per section, all stacked in #scene-stack.
+     Each holds a generative SVG illustration. Active scene
+     fades to opacity 1; others fade out. Subtle ken-burns
+     drift on the active one.
+     ------------------------------------------------------------ */
+  #scene-stack {
+    position: fixed;
+    inset: 0;
+    z-index: 0;
+    pointer-events: none;
+    overflow: hidden;
+  }
+  .scene {
+    position: absolute;
+    inset: 0;
+    opacity: 0;
+    transition: opacity 1.6s ease;
+    will-change: opacity, transform;
+  }
+  .scene.active {
+    opacity: 1;
+    animation: kenBurns 40s ease-in-out infinite alternate;
+  }
+  .scene svg {
+    width: 100%;
+    height: 100%;
+    display: block;
+  }
+  @keyframes kenBurns {
+    0%   { transform: scale(1.04) translate(-1%, 0); }
+    100% { transform: scale(1.08) translate(1%, -1%); }
+  }
+  /* Heavy darkening overlay so foreground text always wins */
+  #scene-veil {
+    position: fixed;
+    inset: 0;
+    z-index: 0;
+    pointer-events: none;
+    background:
+      linear-gradient(180deg, rgba(10,14,19,0.55), rgba(10,14,19,0.78) 60%, rgba(10,14,19,0.92)),
+      radial-gradient(ellipse at 50% 40%, transparent 0%, rgba(10,14,19,0.3) 100%);
+  }
+
+  main { position: relative; z-index: 1; }
+
+  /* ------------------------------------------------------------
+     MILE-COUNTER SCRUBBER RAIL (right edge, fixed)
+     Maps page scroll → 0.0–26.2 mile + cumulative time.
+     Wider panel: track on far right, readout panel to its left.
+     ------------------------------------------------------------ */
+  #mile-rail {
+    position: fixed;
+    top: 0;
+    right: 0;
+    bottom: 0;
+    width: 180px;
+    z-index: 50;
+    pointer-events: none;
+    display: flex;
+    flex-direction: row;
+    align-items: center;
+    justify-content: flex-end;
+    padding-right: 24px;
+    gap: 16px;
+  }
+  /* readout panel — sits to the LEFT of the track */
+  #mile-rail .readout {
+    flex: 1;
+    text-align: right;
+    font-family: var(--mono);
+    pointer-events: none;
+    padding: 14px 0;
+    background: rgba(10,14,19,0.7);
+    border: 1px solid rgba(255,182,18,0.12);
+    border-right: none;
+    backdrop-filter: blur(6px);
+    -webkit-backdrop-filter: blur(6px);
+    padding: 14px 12px;
+    min-width: 110px;
+  }
+  #mile-rail .readout .mi {
+    font-family: var(--serif);
+    font-size: 34px;
+    color: var(--bone);
+    line-height: 1;
+    letter-spacing: -0.02em;
+    white-space: nowrap;
+  }
+  #mile-rail .readout .mi small {
+    font-family: var(--mono);
+    font-size: 11px;
+    color: var(--text-dim);
+    margin-left: 3px;
+  }
+  #mile-rail .readout .time {
+    font-size: 13px;
+    color: var(--gold);
+    letter-spacing: 0.14em;
+    margin-top: 6px;
+    text-transform: uppercase;
+    white-space: nowrap;
+  }
+  #mile-rail .readout .zone-pill {
+    display: inline-block;
+    margin-top: 8px;
+    font-size: 9px;
+    letter-spacing: 0.18em;
+    text-transform: uppercase;
+    color: var(--ink);
+    background: var(--gold);
+    padding: 2px 7px;
+    font-weight: 700;
+  }
+  #mile-rail .readout .lbl {
+    font-size: 9px;
+    color: var(--text-dim);
+    letter-spacing: 0.2em;
+    margin-top: 6px;
+    text-transform: uppercase;
+    white-space: nowrap;
+  }
+  /* track column */
+  #mile-rail .track {
+    position: relative;
+    width: 3px;
+    height: 72vh;
+    background: rgba(255,182,18,0.15);
+    flex-shrink: 0;
+  }
+  #mile-rail .fill {
+    position: absolute;
+    top: 0; left: 0;
+    width: 100%;
+    height: 0%;
+    background: linear-gradient(180deg, var(--z1), var(--z3), var(--z4), var(--z5), var(--z6), var(--gold));
+    transition: height 0.15s linear;
+  }
+  #mile-rail .marker {
+    position: absolute;
+    left: 50%;
+    width: 16px; height: 16px;
+    border-radius: 50%;
+    background: var(--gold);
+    transform: translate(-50%, -50%);
+    box-shadow: 0 0 0 3px var(--ink), 0 0 20px var(--gold);
+    transition: top 0.15s linear;
+  }
+  #mile-rail .tick-set {
+    position: absolute;
+    inset: 0;
+    pointer-events: none;
+  }
+  #mile-rail .tick {
+    position: absolute;
+    right: 0;
+    width: 7px;
+    height: 1px;
+    background: rgba(255,182,18,0.35);
+    transform: translateY(-50%);
+  }
+  #mile-rail .tick.major {
+    width: 12px;
+    background: rgba(255,182,18,0.65);
+  }
+  /* major tick labels go on left side of track now */
+  #mile-rail .tick .lab {
+    position: absolute;
+    right: 16px;
+    top: -6px;
+    font-family: var(--mono);
+    font-size: 8px;
+    color: rgba(255,182,18,0.5);
+    letter-spacing: 0.12em;
+    white-space: nowrap;
+  }
+  @media (max-width: 1200px) {
+    #mile-rail { display: none; }
+  }
+
+  /* ------------------------------------------------------------
+     MINI ELEVATION MAP (bottom-left, fixed)
+     Persistent you-are-here marker.
+     ------------------------------------------------------------ */
+  #mini-map {
+    position: fixed;
+    bottom: 24px;
+    left: 24px;
+    width: 280px;
+    z-index: 40;
+    background: rgba(10,14,19,0.92);
+    border: 1px solid var(--rule);
+    backdrop-filter: blur(8px);
+    -webkit-backdrop-filter: blur(8px);
+    padding: 10px 12px 8px;
+    pointer-events: none;
+    opacity: 0;
+    transform: translateY(8px);
+    transition: opacity 0.4s ease, transform 0.4s ease;
+  }
+  #mini-map.visible {
+    opacity: 1;
+    transform: translateY(0);
+  }
+  #mini-map .head {
+    display: flex;
+    justify-content: space-between;
+    align-items: baseline;
+    font-family: var(--mono);
+    font-size: 9px;
+    letter-spacing: 0.2em;
+    color: var(--text-dim);
+    text-transform: uppercase;
+    margin-bottom: 6px;
+  }
+  #mini-map .head .you { color: var(--gold); }
+  #mini-map svg { display: block; width: 100%; height: 70px; }
+  @media (max-width: 700px) {
+    #mini-map { width: 200px; bottom: 16px; left: 16px; padding: 8px 10px 6px; }
+  }
+
+  /* ------------------------------------------------------------
+     REVEAL-ON-SCROLL
+     ------------------------------------------------------------ */
+  .reveal {
+    opacity: 0;
+    transform: translateY(24px);
+    transition: opacity 0.9s cubic-bezier(.2,.8,.2,1), transform 0.9s cubic-bezier(.2,.8,.2,1);
+  }
+  .reveal.in {
+    opacity: 1;
+    transform: translateY(0);
+  }
+  .reveal.delay-1 { transition-delay: 0.12s; }
+  .reveal.delay-2 { transition-delay: 0.24s; }
+  .reveal.delay-3 { transition-delay: 0.36s; }
+  .reveal.delay-4 { transition-delay: 0.48s; }
+
+  /* ------------------------------------------------------------
+     COURSE MAP (top-down) — paired with elevation
+     ------------------------------------------------------------ */
+
+  /* ============================================================
+     TYPOGRAPHY
+     ============================================================ */
+  .eyebrow {
+    font-family: var(--mono);
+    font-size: 11px;
+    letter-spacing: 0.22em;
+    text-transform: uppercase;
+    color: var(--gold);
+    font-weight: 500;
+  }
+  .eyebrow .dot {
+    display: inline-block;
+    width: 6px; height: 6px;
+    border-radius: 50%;
+    background: var(--gold);
+    margin-right: 8px;
+    vertical-align: 2px;
+    box-shadow: 0 0 12px var(--gold);
+  }
+  h1, h2, h3 { font-family: var(--serif); font-weight: 400; letter-spacing: -0.01em; }
+  h2 { font-size: clamp(28px, 4vw, 48px); line-height: 1.05; color: var(--bone); margin-bottom: 8px; }
+  h3 { font-size: 22px; color: var(--bone); }
+
+  .display {
+    font-family: var(--serif);
+    font-weight: 300;
+    font-size: clamp(56px, 11vw, 168px);
+    line-height: 0.95;
+    letter-spacing: -0.025em;
+    color: var(--bone);
+  }
+  .display em {
+    font-style: italic;
+    color: var(--gold);
+    font-family: var(--serif);
+  }
+
+  .mono { font-family: var(--mono); }
+
+  /* ============================================================
+     LAYOUT
+     ============================================================ */
+  .wrap {
+    max-width: 1280px;
+    margin: 0 auto;
+    padding: 0 32px;
+  }
+  section { padding: 96px 0; position: relative; }
+  section + section { border-top: 1px solid var(--rule); }
+
+  .section-head {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: 24px;
+    margin-bottom: 48px;
+    padding-bottom: 24px;
+    border-bottom: 1px solid var(--rule);
+  }
+  .section-head .num {
+    font-family: var(--mono);
+    color: var(--gold);
+    font-size: 13px;
+    letter-spacing: 0.2em;
+  }
+  .section-head .title { flex: 1; }
+
+  /* ============================================================
+     HERO
+     ============================================================ */
+  .hero {
+    min-height: 100vh;
+    padding: 0;
+    display: flex;
+    flex-direction: column;
+    position: relative;
+    overflow: hidden;
+  }
+  .hero-topo {
+    position: absolute;
+    inset: 0;
+    z-index: 0;
+    opacity: 0.55;
+  }
+  .hero-vignette {
+    position: absolute; inset: 0;
+    background:
+      radial-gradient(ellipse at 50% 30%, transparent 0%, var(--ink) 75%),
+      linear-gradient(180deg, transparent 60%, var(--ink) 100%);
+    z-index: 1;
+  }
+  .hero-inner {
+    position: relative;
+    z-index: 2;
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+    padding: 32px 32px 48px;
+    max-width: 1280px;
+    margin: 0 auto;
+    width: 100%;
+  }
+  .hero-top {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    padding-top: 24px;
+    flex-wrap: wrap;
+    gap: 24px;
+  }
+  .brandmark {
+    font-family: var(--mono);
+    font-size: 11px;
+    letter-spacing: 0.22em;
+    color: var(--text-dim);
+    text-transform: uppercase;
+  }
+  .brandmark strong { color: var(--gold); font-weight: 500; }
+  .coords {
+    font-family: var(--mono);
+    font-size: 11px;
+    letter-spacing: 0.18em;
+    color: var(--text-faint);
+    text-align: right;
+    line-height: 1.7;
+  }
+
+  .hero-mid {
+    margin-top: clamp(40px, 8vh, 120px);
+    max-width: 1100px;
+  }
+  .hero-mid .eyebrow { margin-bottom: 32px; }
+  .hero-sub {
+    margin-top: 24px;
+    font-family: var(--serif);
+    font-style: italic;
+    font-size: clamp(18px, 2vw, 24px);
+    color: var(--text-dim);
+    max-width: 720px;
+    line-height: 1.4;
+  }
+  .hero-sub span { color: var(--bone); font-style: normal; }
+
+  /* Stats strip */
+  .stats {
+    margin-top: 64px;
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 0;
+    border-top: 1px solid var(--rule);
+    border-bottom: 1px solid var(--rule);
+  }
+  .stat {
+    padding: 24px 28px;
+    border-right: 1px solid var(--rule);
+    position: relative;
+  }
+  .stat:last-child { border-right: none; }
+  .stat .label {
+    font-family: var(--mono);
+    font-size: 10px;
+    letter-spacing: 0.2em;
+    color: var(--text-dim);
+    text-transform: uppercase;
+    margin-bottom: 12px;
+  }
+  .stat .value {
+    font-family: var(--serif);
+    font-size: clamp(28px, 3.5vw, 44px);
+    color: var(--bone);
+    line-height: 1;
+    letter-spacing: -0.02em;
+  }
+  .stat .value .unit {
+    font-family: var(--mono);
+    font-size: 13px;
+    color: var(--text-dim);
+    letter-spacing: 0.1em;
+    margin-left: 6px;
+  }
+  .stat.gold .value { color: var(--gold); }
+
+  /* Principles */
+  .principles {
+    margin-top: 48px;
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 16px;
+  }
+  .principle {
+    background: linear-gradient(180deg, rgba(255,182,18,0.04), rgba(255,182,18,0.01));
+    border: 1px solid var(--rule);
+    padding: 28px 24px;
+    position: relative;
+    transition: transform 0.4s cubic-bezier(.2,.8,.2,1), border-color 0.3s;
+  }
+  .principle:hover {
+    transform: translateY(-4px);
+    border-color: var(--gold);
+  }
+  .principle .num {
+    font-family: var(--mono);
+    font-size: 11px;
+    letter-spacing: 0.2em;
+    color: var(--gold);
+    margin-bottom: 16px;
+  }
+  .principle h3 {
+    font-family: var(--serif);
+    font-size: 24px;
+    line-height: 1.1;
+    margin-bottom: 12px;
+    color: var(--bone);
+  }
+  .principle p {
+    font-size: 14px;
+    line-height: 1.55;
+    color: var(--text-dim);
+  }
+  .principle p strong { color: var(--bone); font-weight: 500; }
+
+  /* ============================================================
+     ELEVATION PROFILE
+     ============================================================ */
+  .elev-wrap {
+    background: linear-gradient(180deg, var(--ink-2), var(--ink));
+    border: 1px solid var(--rule);
+    padding: 0;
+    position: relative;
+    overflow: hidden;
+  }
+  .elev-meta {
+    display: flex;
+    justify-content: space-between;
+    padding: 20px 28px;
+    border-bottom: 1px solid var(--rule);
+    flex-wrap: wrap;
+    gap: 16px;
+    font-family: var(--mono);
+    font-size: 11px;
+    letter-spacing: 0.15em;
+    color: var(--text-dim);
+    text-transform: uppercase;
+  }
+  .elev-meta strong { color: var(--gold); font-weight: 500; }
+
+  .elev-svg-wrap {
+    position: relative;
+    width: 100%;
+  }
+  .elev-svg {
+    display: block;
+    width: 100%;
+    height: auto;
+    cursor: crosshair;
+  }
+  .elev-readout {
+    position: absolute;
+    top: 16px; left: 28px;
+    background: rgba(10,14,19,0.92);
+    border: 1px solid var(--rule);
+    padding: 14px 18px;
+    min-width: 280px;
+    backdrop-filter: blur(8px);
+    -webkit-backdrop-filter: blur(8px);
+    pointer-events: none;
+    transition: opacity 0.2s;
+    z-index: 5;
+  }
+  .elev-readout .row {
+    display: flex;
+    justify-content: space-between;
+    font-family: var(--mono);
+    font-size: 11px;
+    letter-spacing: 0.1em;
+    line-height: 1.9;
+  }
+  .elev-readout .row .k { color: var(--text-dim); text-transform: uppercase; }
+  .elev-readout .row .v { color: var(--bone); }
+  .elev-readout .row.zone .v { color: var(--gold); }
+  .elev-readout .mile-big {
+    font-family: var(--serif);
+    font-size: 28px;
+    color: var(--bone);
+    margin-bottom: 6px;
+    line-height: 1;
+  }
+  .elev-readout .mile-big .small { font-size: 14px; color: var(--text-dim); margin-left: 6px; font-family: var(--mono); }
+
+  .elev-zones {
+    display: flex;
+    border-top: 1px solid var(--rule);
+    font-family: var(--mono);
+    font-size: 10px;
+    letter-spacing: 0.15em;
+    text-transform: uppercase;
+    height: 28px;
+  }
+  .elev-zones .z {
+    flex: 1;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: var(--ink);
+    font-weight: 600;
+    border-right: 1px solid rgba(0,0,0,0.3);
+    cursor: pointer;
+    transition: filter 0.2s;
+  }
+  .elev-zones .z:last-child { border-right: none; }
+  .elev-zones .z:hover { filter: brightness(1.2); }
+
+  /* ============================================================
+     ZONE CARDS
+     ============================================================ */
+  .zones-grid {
+    display: grid;
+    gap: 12px;
+  }
+  .zone-card {
+    background: linear-gradient(180deg, var(--ink-2), var(--ink-3));
+    border: 1px solid var(--rule);
+    border-left: 4px solid var(--zc, var(--gold));
+    overflow: hidden;
+    transition: border-color 0.3s;
+  }
+  .zone-card:hover { border-color: rgba(255,182,18,0.35); }
+  .zone-card.open { border-color: var(--zc, var(--gold)); }
+  .zone-head {
+    display: grid;
+    grid-template-columns: 80px 1fr 200px 200px 40px;
+    gap: 16px;
+    align-items: center;
+    padding: 22px 28px;
+    cursor: pointer;
+    user-select: none;
+  }
+  .zone-head .znum {
+    font-family: var(--mono);
+    font-size: 11px;
+    letter-spacing: 0.2em;
+    color: var(--zc, var(--gold));
+  }
+  .zone-head .ztitle {
+    font-family: var(--serif);
+    font-size: 22px;
+    color: var(--bone);
+    line-height: 1.1;
+  }
+  .zone-head .ztitle .miles {
+    display: block;
+    font-family: var(--mono);
+    font-size: 11px;
+    letter-spacing: 0.15em;
+    color: var(--text-dim);
+    margin-top: 4px;
+    text-transform: uppercase;
+  }
+  .zone-head .ztarget {
+    font-family: var(--mono);
+    font-size: 12px;
+    color: var(--text-dim);
+    text-transform: uppercase;
+    letter-spacing: 0.15em;
+  }
+  .zone-head .ztarget strong { color: var(--bone); font-weight: 500; display: block; font-size: 15px; margin-top: 2px; }
+  .zone-head .chev {
+    color: var(--text-dim);
+    transition: transform 0.3s;
+    text-align: right;
+    font-size: 18px;
+  }
+  .zone-card.open .chev { transform: rotate(90deg); color: var(--zc); }
+
+  .zone-body {
+    max-height: 0;
+    overflow: hidden;
+    transition: max-height 0.5s cubic-bezier(.2,.8,.2,1);
+  }
+  .zone-card.open .zone-body { max-height: 1400px; }
+  .zone-body-inner {
+    padding: 8px 28px 32px;
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 32px;
+    border-top: 1px solid var(--rule-soft);
+    padding-top: 24px;
+  }
+  .zone-body h4 {
+    font-family: var(--mono);
+    font-size: 11px;
+    letter-spacing: 0.2em;
+    color: var(--zc, var(--gold));
+    text-transform: uppercase;
+    margin-bottom: 10px;
+    font-weight: 500;
+  }
+  .zone-body p { font-size: 14.5px; line-height: 1.6; color: var(--text); margin-bottom: 16px; }
+  .zone-body p strong { color: var(--bone); }
+  .zone-body ul { list-style: none; }
+  .zone-body li {
+    font-size: 14px;
+    line-height: 1.55;
+    color: var(--text);
+    padding-left: 18px;
+    position: relative;
+    margin-bottom: 8px;
+  }
+  .zone-body li::before {
+    content: '';
+    position: absolute;
+    left: 0; top: 9px;
+    width: 8px; height: 1px;
+    background: var(--zc, var(--gold));
+  }
+
+  .landmarks {
+    grid-column: 1 / -1;
+    background: rgba(0,0,0,0.3);
+    border: 1px solid var(--rule-soft);
+    padding: 16px 20px;
+    margin-top: 4px;
+  }
+  .landmarks .lh {
+    font-family: var(--mono);
+    font-size: 10px;
+    letter-spacing: 0.2em;
+    color: var(--text-dim);
+    text-transform: uppercase;
+    margin-bottom: 10px;
+  }
+  .landmarks .lm {
+    display: flex;
+    gap: 16px;
+    flex-wrap: wrap;
+  }
+  .landmarks .lm span {
+    font-family: var(--mono);
+    font-size: 12px;
+    color: var(--bone);
+    padding: 4px 10px;
+    background: rgba(255,182,18,0.06);
+    border: 1px solid var(--rule-soft);
+    border-radius: 2px;
+  }
+  .landmarks .lm span em {
+    font-style: normal;
+    color: var(--gold);
+    margin-right: 6px;
+  }
+
+  .decision {
+    grid-column: 1 / -1;
+    border-top: 1px dashed var(--rule);
+    padding-top: 18px;
+    margin-top: 4px;
+  }
+  .decision .label {
+    font-family: var(--mono);
+    font-size: 10px;
+    letter-spacing: 0.2em;
+    color: var(--gold);
+    text-transform: uppercase;
+    margin-bottom: 8px;
+  }
+  .decision p {
+    font-family: var(--serif);
+    font-size: 17px;
+    font-style: italic;
+    color: var(--bone);
+    line-height: 1.4;
+    margin: 0;
+  }
+
+  /* ATL warning */
+  .atl-warning {
+    grid-column: 1 / -1;
+    background: linear-gradient(180deg, rgba(217,80,31,0.10), rgba(217,80,31,0.04));
+    border: 1px solid rgba(217,80,31,0.4);
+    border-left: 4px solid #D9501F;
+    padding: 18px 22px;
+    margin-top: 4px;
+  }
+  .atl-warning .wh {
+    font-family: var(--mono);
+    font-size: 11px;
+    letter-spacing: 0.2em;
+    color: #FF7E45;
+    text-transform: uppercase;
+    margin-bottom: 8px;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
+  .atl-warning .wh::before {
+    content: '⚠';
+    font-size: 16px;
+  }
+  .atl-warning p {
+    font-size: 14.5px;
+    color: var(--bone);
+    line-height: 1.55;
+    margin: 0;
+  }
+  .atl-warning p strong { color: #FFA070; }
+
+  /* ============================================================
+     FUELING TIMELINE
+     ============================================================ */
+  .fuel-wrap {
+    background: linear-gradient(180deg, var(--ink-2), var(--ink-3));
+    border: 1px solid var(--rule);
+  }
+  .fuel-scroll {
+    overflow-x: auto;
+    overflow-y: visible;
+    padding: 32px 0 24px;
+    -webkit-overflow-scrolling: touch;
+  }
+  .fuel-scroll::-webkit-scrollbar { height: 8px; }
+  .fuel-scroll::-webkit-scrollbar-track { background: var(--ink); }
+  .fuel-scroll::-webkit-scrollbar-thumb { background: var(--gold-deep); }
+
+  .fuel-track {
+    position: relative;
+    width: 1800px;
+    height: 200px;
+    margin: 0 32px;
+  }
+  .fuel-axis {
+    position: absolute;
+    left: 0; right: 0;
+    top: 100px;
+    height: 2px;
+    background: linear-gradient(90deg, var(--z1), var(--z2), var(--z3), var(--z4), var(--z5), var(--z6), var(--z7));
+  }
+  .fuel-tick {
+    position: absolute;
+    top: 90px;
+    width: 1px;
+    height: 22px;
+    background: var(--text-faint);
+  }
+  .fuel-tick .lbl {
+    position: absolute;
+    top: 26px; left: 50%;
+    transform: translateX(-50%);
+    font-family: var(--mono);
+    font-size: 10px;
+    color: var(--text-dim);
+    letter-spacing: 0.1em;
+    white-space: nowrap;
+  }
+  .fuel-marker {
+    position: absolute;
+    top: 100px;
+    transform: translate(-50%, -50%);
+    width: 44px; height: 44px;
+    border-radius: 50%;
+    background: var(--ink);
+    border: 2px solid var(--gold);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    transition: transform 0.25s, box-shadow 0.25s;
+    z-index: 2;
+    box-shadow: 0 4px 16px rgba(0,0,0,0.6), inset 0 -8px 16px rgba(255,182,18,0.1);
+  }
+  .fuel-marker:hover, .fuel-marker.active {
+    transform: translate(-50%, -50%) scale(1.15);
+    box-shadow: 0 6px 24px rgba(255,182,18,0.4), inset 0 -8px 16px rgba(255,182,18,0.2);
+  }
+  .fuel-marker .icon {
+    font-family: var(--mono);
+    font-size: 11px;
+    font-weight: 600;
+    color: var(--gold);
+    letter-spacing: 0.05em;
+  }
+  .fuel-marker .pin {
+    position: absolute;
+    bottom: -28px;
+    left: 50%;
+    transform: translateX(-50%);
+    font-family: var(--mono);
+    font-size: 10px;
+    color: var(--text-dim);
+    letter-spacing: 0.1em;
+    white-space: nowrap;
+  }
+  .fuel-marker.water { border-color: var(--z2); }
+  .fuel-marker.water .icon { color: var(--z2); }
+  .fuel-marker.banana { border-color: var(--z3); }
+  .fuel-marker.banana .icon { color: var(--z3); }
+  .fuel-marker.gel { border-color: var(--gold); }
+  .fuel-marker.danger { border-color: #D9501F; }
+  .fuel-marker.danger .icon { color: #D9501F; }
+
+  .fuel-detail {
+    background: var(--ink);
+    border-top: 1px solid var(--rule);
+    padding: 28px 32px;
+    min-height: 140px;
+  }
+  .fuel-detail .head {
+    display: flex;
+    justify-content: space-between;
+    align-items: baseline;
+    margin-bottom: 12px;
+    flex-wrap: wrap;
+    gap: 12px;
+  }
+  .fuel-detail h4 {
+    font-family: var(--serif);
+    font-size: 22px;
+    color: var(--bone);
+  }
+  .fuel-detail .meta {
+    font-family: var(--mono);
+    font-size: 11px;
+    color: var(--gold);
+    letter-spacing: 0.15em;
+    text-transform: uppercase;
+  }
+  .fuel-detail p {
+    font-size: 14.5px;
+    line-height: 1.6;
+    color: var(--text);
+    max-width: 760px;
+  }
+  .fuel-detail p strong { color: var(--bone); }
+  .fuel-legend {
+    display: flex;
+    gap: 24px;
+    padding: 16px 32px;
+    border-top: 1px solid var(--rule-soft);
+    flex-wrap: wrap;
+  }
+  .fuel-legend .lg {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-family: var(--mono);
+    font-size: 11px;
+    color: var(--text-dim);
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+  }
+  .fuel-legend .lg .sw {
+    width: 12px; height: 12px;
+    border-radius: 50%;
+    border: 2px solid var(--gold);
+  }
+  .fuel-legend .lg.water .sw { border-color: var(--z2); }
+  .fuel-legend .lg.banana .sw { border-color: var(--z3); }
+  .fuel-legend .lg.danger .sw { border-color: #D9501F; }
+
+  /* ============================================================
+     WRISTBAND
+     ============================================================ */
+  .wb-wrap {
+    display: grid;
+    grid-template-columns: 1fr 360px;
+    gap: 32px;
+    align-items: start;
+  }
+  .wb-info {
+    background: var(--ink-2);
+    border: 1px solid var(--rule);
+    padding: 28px;
+  }
+  .wb-info h3 { font-family: var(--serif); margin-bottom: 16px; }
+  .wb-info p { font-size: 14.5px; line-height: 1.6; color: var(--text); margin-bottom: 12px; }
+  .wb-info ul { list-style: none; margin-top: 16px; }
+  .wb-info li {
+    font-size: 13px;
+    line-height: 1.6;
+    color: var(--text-dim);
+    padding-left: 16px;
+    position: relative;
+    margin-bottom: 6px;
+  }
+  .wb-info li::before {
+    content: '';
+    position: absolute;
+    left: 0; top: 9px;
+    width: 6px; height: 1px;
+    background: var(--gold);
+  }
+  .wb-info .btn {
+    display: inline-block;
+    margin-top: 20px;
+    padding: 14px 22px;
+    background: var(--gold);
+    color: var(--ink);
+    border: none;
+    font-family: var(--mono);
+    font-size: 12px;
+    letter-spacing: 0.2em;
+    text-transform: uppercase;
+    cursor: pointer;
+    font-weight: 600;
+    transition: transform 0.2s, box-shadow 0.2s;
+  }
+  .wb-info .btn:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 8px 24px rgba(255,182,18,0.3);
+  }
+
+  /* The actual wristband strip preview */
+  .wb-strip {
+    background: var(--paper);
+    color: var(--ink);
+    width: 360px;
+    padding: 16px 12px;
+    border-radius: 6px;
+    box-shadow:
+      0 1px 0 rgba(255,255,255,0.1) inset,
+      0 20px 40px rgba(0,0,0,0.6),
+      0 4px 12px rgba(0,0,0,0.4);
+    transform: perspective(1000px) rotateY(-3deg) rotateX(2deg);
+    font-family: var(--mono);
+  }
+  .wb-strip .wb-h {
+    text-align: center;
+    border-bottom: 1.5px solid var(--ink);
+    padding-bottom: 10px;
+    margin-bottom: 8px;
+  }
+  .wb-strip .wb-h .pgh {
+    font-family: var(--serif);
+    font-size: 22px;
+    line-height: 1;
+    letter-spacing: -0.01em;
+    font-weight: 600;
+  }
+  .wb-strip .wb-h .tgt {
+    font-size: 10px;
+    letter-spacing: 0.2em;
+    text-transform: uppercase;
+    margin-top: 4px;
+    color: #555;
+  }
+  .wb-strip .wb-h .tgt strong { color: var(--ink); }
+  .wb-row {
+    display: grid;
+    grid-template-columns: 28px 56px 36px 1fr;
+    gap: 4px;
+    padding: 4px 6px;
+    font-size: 10.5px;
+    border-bottom: 1px dotted #b8af9a;
+    align-items: center;
+  }
+  .wb-row.head {
+    font-size: 8.5px;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    color: #777;
+    border-bottom: 1.5px solid var(--ink);
+    background: var(--paper-2);
+  }
+  .wb-row.crucible { background: rgba(217,80,31,0.18); }
+  .wb-row.fuel { font-weight: 600; }
+  .wb-row .m { font-weight: 700; text-align: center; }
+  .wb-row .pace { font-feature-settings: 'tnum'; }
+  .wb-row .rpe { text-align: center; font-weight: 600; }
+  .wb-row .cue { font-size: 9.5px; }
+  .wb-strip .wb-f {
+    text-align: center;
+    font-size: 8.5px;
+    letter-spacing: 0.15em;
+    text-transform: uppercase;
+    color: #555;
+    margin-top: 8px;
+    padding-top: 6px;
+    border-top: 1.5px solid var(--ink);
+  }
+
+  /* ============================================================
+     IF/THEN
+     ============================================================ */
+  .ifthen-grid {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 16px;
+  }
+  .ifthen-card {
+    perspective: 1400px;
+    height: 360px;
+    cursor: pointer;
+  }
+  .ifthen-inner {
+    position: relative;
+    width: 100%;
+    height: 100%;
+    transform-style: preserve-3d;
+    transition: transform 0.7s cubic-bezier(.2,.8,.2,1);
+  }
+  .ifthen-card.flipped .ifthen-inner { transform: rotateY(180deg); }
+  .ifthen-face {
+    position: absolute;
+    inset: 0;
+    backface-visibility: hidden;
+    -webkit-backface-visibility: hidden;
+    padding: 28px;
+    border: 1px solid var(--rule);
+    background: linear-gradient(180deg, var(--ink-2), var(--ink-3));
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+  }
+  .ifthen-face.back {
+    transform: rotateY(180deg);
+    background: linear-gradient(180deg, var(--ink-3), var(--ink-2));
+    border-color: var(--gold);
+  }
+  .ifthen-face .lbl {
+    font-family: var(--mono);
+    font-size: 11px;
+    letter-spacing: 0.22em;
+    text-transform: uppercase;
+    color: var(--gold);
+  }
+  .ifthen-face .scenario {
+    font-family: var(--serif);
+    font-size: 22px;
+    line-height: 1.2;
+    color: var(--bone);
+    margin-top: 16px;
+    flex: 1;
+    display: flex;
+    align-items: center;
+  }
+  .ifthen-face .response {
+    font-family: var(--serif);
+    font-size: 19px;
+    line-height: 1.3;
+    color: var(--bone);
+    margin: 12px 0;
+    font-style: italic;
+  }
+  .ifthen-face .why {
+    font-size: 13px;
+    line-height: 1.5;
+    color: var(--text-dim);
+  }
+  .ifthen-face .why strong { color: var(--bone); }
+  .ifthen-face .visual {
+    margin-top: 12px;
+    padding: 12px;
+    background: rgba(0,0,0,0.35);
+    border: 1px solid var(--rule-soft);
+    border-radius: 2px;
+    min-height: 70px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+  .ifthen-face .visual svg { display: block; max-width: 100%; height: auto; }
+  .ifthen-face .visual table {
+    width: 100%;
+    border-collapse: collapse;
+    font-family: var(--mono);
+    font-size: 11px;
+  }
+  .ifthen-face .visual th, .ifthen-face .visual td {
+    padding: 4px 6px;
+    border-bottom: 1px solid var(--rule-soft);
+    text-align: left;
+    color: var(--bone);
+  }
+  .ifthen-face .visual th { color: var(--gold); letter-spacing: 0.15em; font-weight: 500; }
+  .ifthen-face .flip-hint {
+    font-family: var(--mono);
+    font-size: 10px;
+    letter-spacing: 0.2em;
+    text-transform: uppercase;
+    color: var(--text-faint);
+    margin-top: 12px;
+  }
+
+  /* ============================================================
+     COACH'S NOTE
+     ============================================================ */
+  .coach {
+    background:
+      linear-gradient(180deg, rgba(255,182,18,0.05), transparent 60%),
+      var(--ink-2);
+    border: 1px solid var(--rule);
+    border-top: 4px solid var(--gold);
+    padding: 56px 56px 64px;
+    position: relative;
+  }
+  .coach::before {
+    content: '';
+    position: absolute;
+    top: 24px; right: 24px;
+    width: 48px; height: 48px;
+    border: 1px solid var(--gold);
+    border-radius: 50%;
+    background:
+      radial-gradient(circle, var(--gold) 0%, var(--gold) 30%, transparent 32%),
+      radial-gradient(circle, transparent 60%, var(--gold) 61%, var(--gold) 64%, transparent 65%);
+    opacity: 0.4;
+  }
+  .coach .eyebrow { margin-bottom: 24px; }
+  .coach h2 { margin-bottom: 32px; max-width: 800px; }
+  .coach h3 {
+    font-family: var(--mono);
+    font-size: 11px;
+    letter-spacing: 0.22em;
+    text-transform: uppercase;
+    color: var(--gold);
+    margin: 32px 0 14px;
+    font-weight: 500;
+  }
+  .coach p {
+    font-family: var(--serif);
+    font-size: 19px;
+    line-height: 1.55;
+    color: var(--text);
+    max-width: 820px;
+    margin-bottom: 16px;
+  }
+  .coach p strong { color: var(--bone); font-weight: 500; }
+  .coach .alt {
+    margin-top: 40px;
+    border-top: 1px dashed var(--rule);
+    padding-top: 32px;
+  }
+  .coach .alt-box {
+    background: var(--ink);
+    border: 1px solid var(--rule);
+    padding: 24px 28px;
+    margin-top: 16px;
+  }
+  .coach .alt-box .scenario-label {
+    font-family: var(--mono);
+    font-size: 10px;
+    letter-spacing: 0.2em;
+    color: var(--gold);
+    text-transform: uppercase;
+    margin-bottom: 8px;
+  }
+  .coach .alt-box .scenario-name {
+    font-family: var(--serif);
+    font-size: 24px;
+    color: var(--bone);
+    margin-bottom: 12px;
+  }
+  .coach .alt-box p {
+    font-family: var(--sans);
+    font-size: 14.5px;
+    line-height: 1.6;
+  }
+  .coach sig {
+    display: block;
+    margin-top: 40px;
+    font-family: var(--serif);
+    font-style: italic;
+    color: var(--text-dim);
+    font-size: 16px;
+  }
+
+  /* ============================================================
+     FOOTER
+     ============================================================ */
+  footer {
+    padding: 48px 32px;
+    border-top: 1px solid var(--rule);
+    text-align: center;
+    font-family: var(--mono);
+    font-size: 11px;
+    letter-spacing: 0.2em;
+    color: var(--text-faint);
+    text-transform: uppercase;
+  }
+  footer .gold { color: var(--gold); }
+
+  /* ============================================================
+     PRINT — wristband only
+     ============================================================ */
+  @media print {
+    body { background: white; color: black; }
+    #topo-bg, #bg-pulse { display: none !important; }
+    section, .hero, header, footer { display: none !important; }
+    .print-wb { display: block !important; }
+    @page { size: 4in 11in; margin: 0.25in; }
+  }
+  .print-wb { display: none; }
+  body.printing > *:not(.print-wb) { display: none; }
+  body.printing .print-wb {
+    display: block;
+    position: relative;
+    background: white;
+    color: black;
+    padding: 12px;
+    width: 3.5in;
+    margin: 0 auto;
+    font-family: var(--mono);
+  }
+  body.printing .print-wb .wb-h {
+    text-align: center;
+    border-bottom: 2px solid black;
+    padding-bottom: 6px;
+    margin-bottom: 6px;
+  }
+  body.printing .print-wb .wb-h .pgh {
+    font-family: var(--serif);
+    font-size: 18px;
+    font-weight: 700;
+  }
+  body.printing .print-wb .wb-h .tgt {
+    font-size: 9px;
+    letter-spacing: 0.15em;
+    text-transform: uppercase;
+  }
+  body.printing .print-wb .wb-row {
+    display: grid;
+    grid-template-columns: 26px 50px 30px 1fr;
+    gap: 3px;
+    padding: 3px 4px;
+    font-size: 9.5px;
+    border-bottom: 1px dotted #999;
+    align-items: center;
+  }
+  body.printing .print-wb .wb-row.head {
+    font-size: 7.5px;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    border-bottom: 1.5px solid black;
+    background: #eee;
+  }
+  body.printing .print-wb .wb-row.crucible { background: #ffd9c8; }
+  body.printing .print-wb .wb-row .m { font-weight: 700; text-align: center; }
+  body.printing .print-wb .wb-row .rpe { text-align: center; font-weight: 600; }
+  body.printing .print-wb .wb-row .cue { font-size: 8.5px; }
+
+  /* ============================================================
+     RESPONSIVE
+     ============================================================ */
+  @media (max-width: 900px) {
+    .wrap { padding: 0 20px; }
+    section { padding: 64px 0; }
+    .stats { grid-template-columns: repeat(2, 1fr); }
+    .stat:nth-child(2) { border-right: none; }
+    .stat:nth-child(1), .stat:nth-child(2) { border-bottom: 1px solid var(--rule); }
+    .principles { grid-template-columns: 1fr; }
+    .zone-head {
+      grid-template-columns: 60px 1fr 30px;
+      gap: 12px;
+    }
+    .zone-head .ztarget { display: none; }
+    .zone-body-inner { grid-template-columns: 1fr; }
+    .ifthen-grid { grid-template-columns: 1fr; }
+    .ifthen-card { height: 400px; }
+    .wb-wrap { grid-template-columns: 1fr; }
+    .wb-strip { width: 100%; max-width: 360px; margin: 0 auto; transform: none; }
+    .coach { padding: 36px 24px; }
+    .hero-mid { margin-top: 60px; }
+  }
+  @media (max-width: 600px) {
+    .stats { grid-template-columns: 1fr; }
+    .stat { border-right: none; border-bottom: 1px solid var(--rule); }
+    .stat:last-child { border-bottom: none; }
+    .elev-readout { left: 16px; right: 16px; min-width: 0; }
+    .section-head { flex-direction: column; align-items: flex-start; }
+  }
+</style>
+</head>
+<body>
+
+<!-- Hidden printable wristband (populated by JS) -->
+<div class="print-wb" id="printWb"></div>
+
+<!-- Background scene image stack — fades by section -->
+<div id="scene-stack" aria-hidden="true"></div>
+<div id="scene-veil" aria-hidden="true"></div>
+
+<!-- Parallax topo background + section-aware pulse layer -->
+<svg id="topo-bg" viewBox="0 0 1600 1000" preserveAspectRatio="none" aria-hidden="true"></svg>
+<div id="bg-pulse" aria-hidden="true"></div>
+
+<!-- Mile-counter scrubber rail (right edge) -->
+<div id="mile-rail" aria-hidden="true">
+  <div class="readout" id="mileReadout">
+    <div class="mi" id="mileNum">0.0<small>/26.2</small></div>
+    <div class="time" id="mileTime">0:00:00</div>
+    <div class="zone-pill" id="mileZone">PRE-RACE</div>
+    <div class="lbl" id="mileLbl">SCROLL TO TRACK</div>
+  </div>
+  <div class="track">
+    <div class="tick-set" id="mileTicks"></div>
+    <div class="fill" id="mileFill"></div>
+    <div class="marker" id="mileMarker"></div>
+  </div>
+</div>
+
+<!-- Mini you-are-here elevation map (bottom-left) -->
+<div id="mini-map" aria-hidden="true">
+  <div class="head"><span>ELEVATION · 0–26.2</span><span class="you" id="miniYou">YOU · M 0.0</span></div>
+  <svg id="miniMapSvg" viewBox="0 0 280 70" preserveAspectRatio="none"></svg>
+</div>
+
+<main>
+
+<!-- ===================== HERO ===================== -->
+<section class="hero" id="hero">
+  <svg class="hero-topo" viewBox="0 0 1600 900" preserveAspectRatio="xMidYMid slice" id="heroTopo"></svg>
+  <div class="hero-vignette"></div>
+
+  <div class="hero-inner">
+    <div class="hero-top">
+      <div class="brandmark">PITTSBURGH MARATHON · <strong>03 · MAY · 2026</strong> · RACE EXECUTION DOSSIER</div>
+      <div class="coords">
+        40.4406° N · 79.9959° W<br>
+        START 06:55 EDT · ELEV 750FT<br>
+        ATHLETE: <span style="color:var(--gold)">L. MATSON</span>
+      </div>
+    </div>
+
+    <div class="hero-mid">
+      <div class="eyebrow"><span class="dot"></span>RACE EXECUTION PLAN · v1.0 · CONFIDENTIAL TO ATHLETE</div>
+      <div class="display">Run the <em style="font-family: sans-serif">course</em>,<br>not the <em style="font-family: sans-serif">clock</em>.</div>
+      <div class="hero-sub" style="font-size: 25.6px; width: 820px">A Pittsburgh-specific execution model built around <span>effort, not pace</span> — with hard guardrails for the first 13.1 and a contingency tree for everything after.</div>
+    </div>
+
+    <div style="position:relative; z-index:2; max-width:1280px; margin:0 auto; width:100%; padding:0 32px;">
+      <div class="stats">
+        <div class="stat gold">
+          <div class="label">Primary Target</div>
+          <div class="value">3:35:00<span class="unit">A-GOAL</span></div>
+        </div>
+        <div class="stat">
+          <div class="label">Backup Target</div>
+          <div class="value">3:45:00<span class="unit">B-GOAL</span></div>
+        </div>
+        <div class="stat">
+          <div class="label">Avg Pace · A</div>
+          <div class="value">8:13<span class="unit">/MI</span></div>
+        </div>
+        <div class="stat">
+          <div class="label">Total Gain</div>
+          <div class="value">933<span class="unit">FT</span></div>
+        </div>
+      </div>
+
+      <div class="principles">
+        <div class="principle">
+          <div class="num">PRINCIPLE 01</div>
+          <h3>Effort &gt; Pace.<br>Always.</h3>
+          <p>RPE and HR are the truth on a course with 933 ft of gain. <strong>Pace targets are downstream of effort targets.</strong> If the hill steals 25 sec/mi but RPE stays at 5, you are on plan. If pace is on but RPE has crept to 7 by mile 8, you are off plan — back off immediately.</p>
+        </div>
+        <div class="principle">
+          <div class="num">PRINCIPLE 02</div>
+          <h3>The first<br>10 are a leash.</h3>
+          <p>ATL went out at 7:18 through the half — 30 sec/mi too hot — and the wheels came off at 20. <strong>Pittsburgh is not won in the first 10 miles. It is lost there.</strong> First 3 miles are 8:25–8:35. No exceptions, no negotiation, no &ldquo;the legs feel great today.&rdquo;</p>
+        </div>
+        <div class="principle">
+          <div class="num">PRINCIPLE 03</div>
+          <h3>The Hill is<br>a checkpoint.</h3>
+          <p>Forbes Ave at miles 11–13 is <strong>not the race</strong> — it is a 200-ft toll gate to the second half. Climb it on RPE 6, never RPE 8. Lose 30–60 sec on Forbes; do not try to claw it back in Shadyside. The course gives those seconds back at miles 22–24.</p>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ===================== ELEVATION PROFILE ===================== -->
+<section id="elevation">
+  <div class="wrap">
+    <div class="section-head">
+      <div>
+        <div class="num">SECTION 01 / 07 · TERRAIN</div>
+        <h2 class="title">The course, read as terrain.</h2>
+      </div>
+      <div class="eyebrow"><span class="dot"></span>HOVER · TAP · SCRUB</div>
+    </div>
+
+    <div class="elev-wrap">
+      <div class="elev-meta">
+        <span>0.0 → 26.2 MI · GAIN <strong>933 FT</strong> · LOSS <strong>933 FT</strong> · NET <strong>± 0</strong></span>
+        <span>SCALE: 1 PX ≈ 5.6 FT VERT · HOVER / TAP TO SCRUB</span>
+      </div>
+      <div class="elev-svg-wrap">
+        <svg class="elev-svg" viewBox="0 0 1600 520" preserveAspectRatio="none" id="elevSvg"></svg>
+        <div class="elev-readout" id="elevReadout">
+          <div class="mile-big" id="erMile">MI 0.0<span class="small">/26.2</span></div>
+          <div class="row zone"><span class="k">Zone</span><span class="v" id="erZone">Z1 · Settle</span></div>
+          <div class="row"><span class="k">Elevation</span><span class="v" id="erElev">750 ft</span></div>
+          <div class="row"><span class="k">Grade</span><span class="v" id="erGrade">+0.0 %</span></div>
+          <div class="row"><span class="k">RPE Target</span><span class="v" id="erRpe">3–4 / 10</span></div>
+          <div class="row"><span class="k">Pace Target</span><span class="v" id="erPace">8:25–8:35</span></div>
+          <div class="row"><span class="k">Fuel Cue</span><span class="v" id="erFuel">Sip water</span></div>
+        </div>
+      </div>
+      <div class="elev-zones" id="elevZones"></div>
+    </div>
+  </div>
+</section>
+
+<!-- ===================== ZONE CARDS ===================== -->
+<section id="zones">
+  <div class="wrap">
+    <div class="section-head">
+      <div>
+        <div class="num">SECTION 02 / 07 · ZONES</div>
+        <h2 class="title">Seven zones. One race.</h2>
+      </div>
+      <div class="eyebrow"><span class="dot"></span>CLICK ANY ZONE TO EXPAND</div>
+    </div>
+
+    <div class="zones-grid" id="zonesGrid"></div>
+  </div>
+</section>
+
+<!-- ===================== FUELING ===================== -->
+<section id="fuel">
+  <div class="wrap">
+    <div class="section-head">
+      <div>
+        <div class="num">SECTION 03 / 07 · FUELING</div>
+        <h2 class="title">Six gels, one banana, eleven water cues.</h2>
+      </div>
+      <div class="eyebrow"><span class="dot"></span>INTERACTIVE RUN TIMELINE</div>
+    </div>
+
+    <div class="fuel-wrap">
+      <div class="fuel-scroll">
+        <div class="fuel-track" id="fuelTrack"></div>
+      </div>
+      <div class="fuel-detail" id="fuelDetail">
+        <div class="head">
+          <h4 id="fdTitle">Tap any marker for the fueling rationale.</h4>
+          <span class="meta" id="fdMeta">— · — MI</span>
+        </div>
+        <p id="fdBody">Every gel is timed to a flat or descending segment. Fueling on a climb compresses the diaphragm against a working stomach — the result is nausea, side-stitch, and a stomach that refuses the next gel an hour later. The protocol below is non-negotiable.</p>
+      </div>
+      <div class="fuel-legend">
+        <div class="lg"><span class="sw"></span>GEL · ~25 G CARB</div>
+        <div class="lg water"><span class="sw"></span>WATER STATION · ALWAYS</div>
+        <div class="lg banana"><span class="sw"></span>HALF BANANA · SOLID FUEL</div>
+        <div class="lg danger"><span class="sw"></span>DO NOT FUEL · CLIMB</div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ===================== WRISTBAND ===================== -->
+<section id="wristband">
+  <div class="wrap">
+    <div class="section-head">
+      <div>
+        <div class="num">SECTION 04 / 07 · WRISTBAND</div>
+        <h2 class="title">Twenty-six miles, on a strip of paper.</h2>
+      </div>
+      <div class="eyebrow"><span class="dot"></span>3.5" × 10.5" · WRAP &amp; TAPE</div>
+    </div>
+
+    <div class="wb-wrap">
+      <div class="wb-info">
+        <h3>Read this when your brain lies.</h3>
+        <p>The wristband is the last line of defense at mile 20. Every mile lists target pace, RPE, cumulative time at the 3:35 split, and a one-line action cue.</p>
+        <p>Highlighted rows are <strong>The Crucible (M11–13)</strong>. Bold rows are <strong>fuel cues</strong>. If your watch and the wristband disagree, the wristband wins — pace it back, not forward.</p>
+        <ul>
+          <li>Print on paper, not cardstock — paper conforms to the wrist when wet.</li>
+          <li>Tape over with packing tape before pinning — sweat will eat ink.</li>
+          <li>Mount on the inside of the left wrist, ahead of the watch face.</li>
+        </ul>
+        <button class="btn" id="printBtn">Print Wristband ⏎</button>
+      </div>
+      <div class="wb-strip" id="wbStrip"></div>
+    </div>
+  </div>
+</section>
+
+<!-- ===================== IF/THEN ===================== -->
+<section id="ifthen">
+  <div class="wrap">
+    <div class="section-head">
+      <div>
+        <div class="num">SECTION 05 / 07 · CONTINGENCY</div>
+        <h2 class="title">If X, then Y. Decisions made before they're needed.</h2>
+      </div>
+      <div class="eyebrow"><span class="dot"></span>TAP CARD TO REVEAL RESPONSE</div>
+    </div>
+
+    <div class="ifthen-grid" id="ifthenGrid"></div>
+  </div>
+</section>
+
+<!-- ===================== COACH'S NOTE ===================== -->
+<section id="coach">
+  <div class="wrap">
+    <div class="section-head">
+      <div>
+        <div class="num">SECTION 06 / 07 · COACH'S NOTE</div>
+        <h2 class="title">One paragraph, no hedging.</h2>
+      </div>
+    </div>
+
+    <div class="coach">
+      <div class="eyebrow"><span class="dot"></span>FROM THE DESK OF YOUR COACH</div>
+      <h2>Pittsburgh is not Atlanta with hills in different places.</h2>
+
+      <h3>The single biggest strategic difference</h3>
+      <p>In Atlanta, the hills are <strong>distributed</strong> — eight noticeable climbs scattered across 26.2 miles, each one taxing but recoverable. The damage you did at ATL was not from the terrain; it was from the <strong>flat first half</strong> tempting you to bank time. You ran 7:18 pace through 13.1 because the course let you, and the back nine punished you for it.</p>
+      <p>Pittsburgh inverts that geometry. <strong>The terrain itself is the governor.</strong> Forbes Ave at miles 11–13 is the most concentrated single climb in any major US marathon — 200 vertical feet in roughly half a mile, peaking at the exact moment a flat-course runner would be considering a surge. You cannot bank time before it (the early miles have rolling terrain that punishes anyone running 7:30s); you cannot bank time on it (anyone trying to hold marathon pace up Forbes is buying a 10-minute crater at mile 22); and the second half is a 7-mile rolling grind through Shadyside, Bloomfield, and Highland Park that rewards only one thing: <strong>arriving at mile 14 with your aerobic system intact.</strong> The whole race is a problem of <em>not detonating before the flat 22–24 stretch where you can finally use your fitness.</em> ATL was a pacing failure. Pittsburgh will be an <strong>impulse-control test.</strong> The course is engineered to extract your worst instincts. Bring guardrails.</p>
+
+      <div class="alt">
+        <h3>An alternative you probably haven't considered</h3>
+        <div class="alt-box">
+          <div class="scenario-label">PROTOCOL · HR-CAP ONLY</div>
+          <div class="scenario-name">Run the first 10 miles with no pace target whatsoever.</div>
+          <p>Cover the watch face. Set a single hard ceiling: <strong>HR ≤ 83 % of max (≈ 162 bpm for you)</strong> from the gun through the base of Forbes Ave. Whatever pace that produces — 8:05, 8:30, 8:45 — is the right pace. You release the cap at mile 11 and run Forbes by RPE only. From mile 14 onward, pace becomes a permitted reference, never a target.</p>
+          <p>The case for it: every blowup in your training log, including ATL, has the same fingerprint — heart rate creeping into 84–87 % range for 30 minutes before pace falls apart. You don't have a fitness problem. You have a <strong>pace-anchoring problem</strong>: the watch tells you a number, the number feels achievable, and you defend it past the point your physiology is asking you to ease. An HR cap removes the anchor. It feels insultingly slow for the first 40 minutes. Then, somewhere around mile 12, the runners who went out at 7:50s start coming back to you. By mile 20, you're the one doing the catching, and your stomach still works because you fueled on a calm aerobic system instead of one in zone-4 distress.</p>
+          <p>The risk: if your HR monitor glitches (cold start is the usual failure mode for the first mile), you have no backup target. Mitigation: pre-warm the strap for 5 min at the start corral, and if the first-mile HR reads obvious garbage, fall back to <strong>RPE 3 / nasal breathing only</strong> for that mile and reassess.</p>
+        </div>
+        <p style="margin-top: 20px; font-size: 14.5px; font-family: var(--sans); color: var(--text);">I am not telling you to run this protocol. I am telling you to <strong>decide before race morning</strong> whether you are running it. The worst version of race day is the one where you start with a pace plan, switch to an HR plan at mile 5 in panic, then switch back at mile 9 because the HR plan feels too slow. Pick one tool. Trust it. The plan above (Sections 01–05) is built around effort-matched pace. The HR-cap protocol is built around effort, period. Either works. Mixing them does not.</p>
+      </div>
+
+      <sig>— Coach</sig>
+    </div>
+  </div>
+</section>
+
+</main>
+
+<footer>
+  PITTSBURGH MARATHON · MAY 03, 2026 · ATHLETE <span class="gold">LOGAN MATSON</span> · BIB TBD<br>
+  EXECUTION PLAN v1.0 — SUBJECT TO REVISION ON RACE-MORNING WX REPORT
+</footer>
+
+<script>
+/* =============================================================
+   COURSE DATA — Pittsburgh Marathon
+   Real elevation profile based on the published course.
+   ============================================================= */
+
+// Sampled elevation in feet — one sample every 0.2 miles, 0.0 → 26.2
+// Built from course terrain notes:
+//  M0–3   Strip District / 16th St Bridge / North Shore — flat ~720
+//  M3–6   North Shore / West End — gentle roll
+//  M6–9   West End Bridge / South Side — gentle roll, dip
+//  M10    West End → start of approach climb
+//  M11–13 FORBES AVE / OAKLAND — THE HILL — peak ~920
+//  M13–14 Schenley / Pitt — rolling
+//  M14–16 Shadyside — rolling
+//  M16–17 Frick / Penn Ave — climb
+//  M18–19 Bloomfield bridge — descent + climb
+//  M20–21 Highland Park grind
+//  M22–24 net descent through Strip District
+//  M25–26 flat finish at the Boulevard
+const ELEV = [
+  // 0.0 - 3.0 — Strip / North Shore — flat
+  745,743,740,738,735,732,730,728,726,724,722,720,718,720,722,
+  // 3.0 - 6.0 — PNC Park / West End — gentle roll
+  724,728,732,734,736,738,736,732,728,725,722,720,718,716,714,
+  // 6.0 - 9.0 — Birmingham Bridge / South Side flats — gentle dip & roll
+  712,710,708,710,712,716,720,724,726,728,730,732,734,736,738,
+  // 9.0 - 11.0 — approach to Forbes
+  742,748,756,766,778,792,808,824,838,852,
+  // 11.0 - 13.0 — THE HILL — Forbes Ave climb
+  866,884,902,914,920,922,920,915,908,900,
+  // 13.0 - 14.0 — Schenley plateau + small drop
+  894,888,884,880,878,
+  // 14.0 - 17.0 — Shadyside rolling, Frick climb
+  876,880,886,892,898,902,908,914,920,924,920,914,908,902,896,
+  // 17.0 - 19.0 — Frick / Bloomfield descent + climb
+  890,880,866,852,838,824,832,844,856,866,
+  // 19.0 - 21.0 — Highland Park grind
+  872,876,880,884,886,888,884,880,876,870,
+  // 21.0 - 24.0 — descent back through Strip
+  862,852,840,826,810,792,772,754,738,724,712,702,694,688,684,
+  // 24.0 - 26.2 — flat finish
+  682,680,678,676,674,672,670,668,666,664,662
+]; // length = 131  (covers 0.0 → 26.0 in 0.2 increments) + 1 = 26.2
+
+// Sanity: ensure 132 points (0.0 → 26.2 step 0.2 = 132 points)
+// We'll handle whatever length we have and stretch.
+
+const ZONES = [
+  {
+    id: 'Z1', num: '01', name: 'Settle',
+    miles: '0.0 – 3.0', startMi: 0, endMi: 3,
+    color: 'var(--z1)',
+    terrain: 'Flat through the Strip District, across the 16th Street Bridge, into the North Shore. The crowd is thick, the corral release is fast, the temptation to surge with the pack is enormous.',
+    rpeText: 'RPE 3 / 10', hrText: '78–82% max (~155–161 bpm)',
+    paceA: '8:25–8:35 /mi', paceB: '8:50–9:00 /mi',
+    physio: '<strong>The first 30 minutes are entirely aerobic.</strong> You have not warmed up — your lactate buffering, fat oxidation, and HR drift are still calibrating. Running 7:50s here costs you nothing right now; it costs you 3 minutes at mile 22. Glycogen is finite and irreplaceable; spending it 30 sec/mi too fast at minute 5 is a withdrawal you cannot make back.',
+    rules: [
+      'If pace shows 8:00 or faster, ease back IMMEDIATELY — do not finish the mile at that pace.',
+      'If HR exceeds 162 bpm in mile 1–3, walk through the next water station for 10 seconds.',
+      'If you feel "great," that is the warning sign, not the green light.',
+      'Run by sound: you should be able to speak a full sentence to the runner next to you.'
+    ],
+    decision: 'If at mile 3 split is faster than 25:15, the next mile is 8:45 — non-negotiable. You are not "banking time"; you are spending it at 18% interest.',
+    landmarks: [
+      ['M 0.0', 'START · Liberty Ave / Smithfield'],
+      ['M 1.2', 'Strip District'],
+      ['M 1.8', '16th St Bridge'],
+      ['M 2.4', 'North Shore (PNC Park visible)']
+    ],
+    atlWarning: true
+  },
+  {
+    id: 'Z2', num: '02', name: 'Cruise',
+    miles: '3.0 – 6.0', startMi: 3, endMi: 6,
+    color: 'var(--z2)',
+    terrain: 'North Shore Riverwalk past PNC Park and Heinz Field, west to West End. Gently rolling, mostly flat, broad streets, the first real opportunity to lock into goal effort.',
+    rpeText: 'RPE 4 / 10', hrText: '80–83% max (~159–164 bpm)',
+    paceA: '8:13–8:18 /mi', paceB: '8:35–8:40 /mi',
+    physio: 'You are now warmed up. <strong>HR drift is normal here</strong> — expect 1–2 bpm rise per mile at constant effort due to thermoregulation. Do not chase the lower HR by surging; do not slow to chase a number. Lock RPE 4 and let HR be what it is. The gentle roll exposes pacing errors — uphills feel disproportionately hard if you went out too fast.',
+    rules: [
+      'First gel at mile 4 — flat ground, before any climb.',
+      'On any uphill in this zone, hold RPE — pace will drop 10–15 sec/mi. That is correct.',
+      'On the corresponding descent, do not "make it back" — let pace return naturally.'
+    ],
+    decision: 'If your average pace through 6 mi is faster than 8:13, you are in trouble already. Slow to 8:25 for the next 3 miles and recommit.',
+    landmarks: [
+      ['M 3.4', 'PNC Park'],
+      ['M 3.8', 'Heinz Field / Acrisure Stadium'],
+      ['M 5.2', 'West End approach']
+    ]
+  },
+  {
+    id: 'Z3', num: '03', name: 'River Roll',
+    miles: '6.0 – 10.0', startMi: 6, endMi: 10,
+    color: 'var(--z3)',
+    terrain: 'West End Bridge, over the Mon to the South Side, east along Carson Street. Mostly flat with a long shallow approach beginning around mile 9.5. Last fully flat zone of the race.',
+    rpeText: 'RPE 4 / 10', hrText: '81–84% max (~161–166 bpm)',
+    paceA: '8:10–8:15 /mi', paceB: '8:32–8:38 /mi',
+    physio: 'Your job in this zone is <strong>preservation, not production.</strong> Save 1–2% of available output for Forbes. The South Side flats are deceptively fast and crowd-energized. This is where your ATL race fell apart in retrospect — not at mile 20, but at mile 8, when you let pace drift to 7:25 because it felt easy.',
+    rules: [
+      'Gel #2 at mile 7. Water at every station, full cup, walk-through allowed.',
+      'Do not run with the 3:30 pace group if they appear here — they are running their race, not yours.',
+      'Begin mental rehearsal of the Forbes climb at mile 9.5 — visualize the gear-shift.'
+    ],
+    decision: 'If you arrive at mile 10 above 1:22:30, you went out too hard. Reset — Forbes will sort it out painfully. If at 1:23:30+ you are exactly on plan; trust it.',
+    landmarks: [
+      ['M 6.4', 'West End Bridge'],
+      ['M 7.0', 'South Side (Carson St E)'],
+      ['M 9.0', 'Birmingham Bridge approach']
+    ]
+  },
+  {
+    id: 'Z4', num: '04', name: 'The Approach',
+    miles: '10.0 – 11.0', startMi: 10, endMi: 11,
+    color: 'var(--z4)',
+    terrain: 'Cross the Birmingham Bridge over the Mon, transition onto Forbes Ave. The road tilts up gradually before the wall. This is the staging zone.',
+    rpeText: 'RPE 5 / 10', hrText: '83–85% max (~164–168 bpm)',
+    paceA: '8:20–8:30 /mi (climbing)', paceB: '8:45–8:55 /mi',
+    physio: 'You are now spending lactate-buffer reserves. Shorten stride, increase cadence by 3–5 spm, drop pace expectation by 10 sec/mi <em>before the grade demands it</em>. <strong>Pre-emptive deceleration is the trade.</strong> Your body needs to be at submaximal effort going into Forbes, not at threshold.',
+    rules: [
+      'No gel here — the climb starts in 5 minutes; diaphragm rule applies.',
+      'Empty water cup early in the zone, not late.',
+      'Lift gaze to the top of the bridge, not the road in front of you. Visual horizon = posture.'
+    ],
+    decision: 'If RPE is already 6 at the bridge, you are over-committed. Run Forbes at RPE 6 anyway (do not surge), and accept a 3:38 finish gracefully.',
+    landmarks: [
+      ['M 10.2', 'Birmingham Bridge'],
+      ['M 10.8', 'Forbes Ave / Oakland boundary']
+    ]
+  },
+  {
+    id: 'Z5', num: '05', name: 'The Crucible',
+    miles: '11.0 – 13.0', startMi: 11, endMi: 13,
+    color: 'var(--z5)',
+    terrain: 'Forbes Avenue through Oakland — the University of Pittsburgh, Carnegie Mellon, Schenley Plaza. <strong>200 vertical feet in roughly 0.5 miles concentrated in the middle of the climb.</strong> The race&apos;s defining segment.',
+    rpeText: 'RPE 6 / 10 (CAP)', hrText: '85–88% max (~168–173 bpm)',
+    paceA: '9:00–9:30 /mi (climb) → 8:00 (Schenley)', paceB: '9:30–10:00 /mi → 8:25',
+    physio: 'On a 6–8% grade your VO2 cost rises 8–12% per percent of grade. <strong>Holding goal pace would put you at threshold or above</strong> — and you cannot run threshold for 13.2 more miles. The smart climb runs at RPE 6 and accepts a 60–90 second loss against goal pace. The plateau at Schenley (M13) is where you reset, not where you surge.',
+    rules: [
+      'Shorten stride. Lean from the ankles, not the waist. Arms pump straight back, not across.',
+      'Count cadence in groups of 30. Breath: 3-2 in / 2-2 out as needed.',
+      'No fueling on the climb itself. Water OK if a station appears mid-climb.',
+      'At the crest, do NOT accelerate. Hold RPE 5 for 2 minutes to re-buffer before normalizing.'
+    ],
+    decision: 'If at mile 13 cumulative time is over 1:48:30, downshift to the 3:45 plan. The math no longer supports 3:35; chasing it will produce a 3:55. <strong>Drop the goal cleanly, run the back half well, finish strong.</strong>',
+    landmarks: [
+      ['M 11.4', 'Forbes / Bouquet (climb peak)'],
+      ['M 12.6', 'Schenley Plaza'],
+      ['M 12.9', 'CMU / Carnegie Library']
+    ]
+  },
+  {
+    id: 'Z6', num: '06', name: 'The Grind',
+    miles: '13.0 – 21.0', startMi: 13, endMi: 21,
+    color: 'var(--z6)',
+    terrain: 'Shadyside, Frick Park, Bloomfield, Highland Park. Continuous rolling 4–6% grades in both directions. No long flats, no long climbs — just relentless undulation. Crowd thinner, mental terrain harder than physical terrain.',
+    rpeText: 'RPE 6–7 / 10', hrText: '85–88% max',
+    paceA: '8:10–8:25 /mi (avg)', paceB: '8:35–8:50 /mi',
+    physio: 'You are now in the carbohydrate-substrate-management phase. Each gel buys you ~30 minutes of oxidation. Glycogen depletion is the hard cap on this zone — protect it ferociously. <strong>Average HR will drift up 5–8 bpm at constant pace; this is normal cardiac drift, not failure.</strong>',
+    rules: [
+      'Gels at miles 14, 17, 20. Banana at 19 if stomach is calm.',
+      'Run uphills at RPE 6, downhills at RPE 5 — do NOT bomb descents. Quad damage compounds.',
+      'Mile 18 is the psychological low point. Have a pre-rehearsed phrase. Use it.',
+      'Form check at every mile marker: shoulders, hands, hips. 5-second self-audit.'
+    ],
+    decision: 'If pace falls more than 25 sec/mi off plan for two consecutive miles, you are bonking — eat the banana NOW and walk 30 seconds at the next water station to clear and reset.',
+    landmarks: [
+      ['M 14.0', 'Shadyside'],
+      ['M 16.5', 'Frick Estate'],
+      ['M 18.5', 'Bloomfield Bridge'],
+      ['M 20.2', 'Highland Park']
+    ]
+  },
+  {
+    id: 'Z7', num: '07', name: 'Bring It Home',
+    miles: '21.0 – 26.2', startMi: 21, endMi: 26.2,
+    color: 'var(--z7)',
+    terrain: 'Net descent of ~180 ft over miles 22–24 back through the Strip District, then a flat finish along the Boulevard of the Allies into downtown. The course gives you the gift you earned.',
+    rpeText: 'RPE 7 → 9 / 10', hrText: '88–92% max',
+    paceA: '7:55–8:05 /mi', paceB: '8:20–8:30 /mi',
+    physio: 'The downhill from 21 to 24 lets HR settle even as pace climbs. <strong>Use the descent without surging</strong> — let gravity do the work, do not extend stride. Cadence stays at 178–182. The last 2.2 miles are flat and you will know your finishing time within 30 seconds at mile 24.',
+    rules: [
+      'Final gel at mile 22 — bottom of the descent, flat ground.',
+      'Do not surge until mile 24. Then convert remaining reserves into pace.',
+      'Last mile is run on memory, not measurement. Cover the watch.'
+    ],
+    decision: 'If at mile 24 you still feel measured, push to RPE 9 for the last 2.2. If you are clinging to form, hold what you have — this is what you trained for. Either way, do not stop running until the chip mat.',
+    landmarks: [
+      ['M 22.5', 'Strip District descent'],
+      ['M 24.5', 'Boulevard of the Allies'],
+      ['M 26.2', 'FINISH · Point State Park']
+    ]
+  }
+];
+
+const FUEL = [
+  { mi: 0.5, type: 'water',   title: 'Water · Station 1',  body: 'Sip only — your stomach is empty and your HR is settling. Full cup at mile 4, not now. <strong>The job in mile 1 is not hydration; it is pace control.</strong>' },
+  { mi: 2.0, type: 'water',   title: 'Water · Station 2',  body: 'Full cup, walk-through if needed. Heart rate is settling. Hydration windows are easy here — every flat section before mile 10 is a gift, take them all.' },
+  { mi: 4.0, type: 'gel',     title: 'Gel #1 · ~25g carb', body: '<strong>First gel — flat ground, before any meaningful grade.</strong> Take with 4–6 oz water. The 30-minute mark is when liver glycogen starts to draw down measurably; the gel arrives in your bloodstream just in time. Caffeinated gel optional here, mandatory at mile 17.' },
+  { mi: 5.5, type: 'water',   title: 'Water · Station 3',  body: 'Full cup. You are at North Shore — flat, breezy, easy to drink. Bank fluid; mile 7 has another gel.' },
+  { mi: 7.0, type: 'gel',     title: 'Gel #2 · ~25g carb', body: 'South Side flats. Take 8 oz water with this one — the gel is concentrated and dehydrated absorption is slow. <strong>Do not skip a fueling cue because you "feel fine."</strong> By the time you do not feel fine it is too late to fix.' },
+  { mi: 9.0, type: 'water',   title: 'Water · Station 4',  body: 'Last full hydration window before the climb. Drink generously. The next two miles you will not feel like drinking, then the climb starts.' },
+  { mi: 10.5, type: 'danger', title: 'DO NOT FUEL · Climb begins', body: '<strong>The diaphragm rule:</strong> fueling on a climb compresses the diaphragm against a stomach trying to absorb concentrated carbohydrate. The result is nausea, side-stitch, and a stomach that will refuse the next gel for 60+ minutes. Hold any planned gel until mile 14.' },
+  { mi: 12.5, type: 'water',  title: 'Water · Schenley',   body: 'Mid-climb water if a station appears here — small sips only. The descent at mile 13 is the recovery; do not drown the stomach right before it.' },
+  { mi: 14.0, type: 'gel',    title: 'Gel #3 · ~25g carb', body: 'Top of Shadyside roller — first flat-ish section after Forbes. <strong>This is the gel you almost skip because you feel beat up. Take it anyway.</strong> The bonk at mile 20 is bought right here at mile 14.' },
+  { mi: 15.5, type: 'water',  title: 'Water · Station 6',  body: 'Standard cup. Cardiac drift is real now — your HR is 5+ bpm above where it was at the same pace at mile 4. That is fine. Hydration buffers it.' },
+  { mi: 17.0, type: 'gel',    title: 'Gel #4 · CAFFEINATED', body: '<strong>Caffeinated gel.</strong> ~50–80 mg caffeine. Enters bloodstream in 15 min, peaks at mile 19 — exactly the psychological low point. The caffeine is not for energy; it is for <em>perceived effort reduction</em>. Same physiology, lower RPE.' },
+  { mi: 18.5, type: 'water',  title: 'Water · Bloomfield', body: 'After the bridge climb. Take it easy here — small sips. Stomach is more sensitive at hour 2:30 than at hour 0:30.' },
+  { mi: 19.5, type: 'banana', title: 'Half banana · solid fuel', body: 'Optional — <strong>only if stomach is calm.</strong> Solid food at mile 19 is a glycogen insurance policy and a mental reset (something to chew on). If you feel any nausea, skip it without regret. The next gel is 30 minutes away.' },
+  { mi: 20.5, type: 'gel',    title: 'Gel #5 · ~25g carb', body: 'Highland Park grind. Last gel before the descent. By now your absorption rate is degraded — chase with 8+ oz water and walk through the next station for 5 seconds if needed. <strong>5 seconds at mile 20 saves 90 seconds at mile 25.</strong>' },
+  { mi: 22.0, type: 'gel',    title: 'Gel #6 · CAFFEINATED FINAL', body: 'Bottom of the Strip descent. Final caffeinated gel. This one is for the last 4 miles. Take with whatever water remains. After this, no more fuel — you have everything you need on board.' },
+  { mi: 23.5, type: 'water',  title: 'Water · Station 9',  body: 'Last sip-stop. Walk through is permitted but optional. From here, you run.' }
+];
+
+const IFTHEN = [
+  {
+    scenario: 'My HR is 4 bpm above target at mile 5 but pace is correct.',
+    response: 'Slow pace by 10 sec/mi for the next mile and reassess.',
+    why: 'HR drift before mile 6 means you are running above sustainable. Fix it now while it costs you 30 seconds total. Fixing it at mile 18 costs you 4 minutes.',
+    visual: '<svg viewBox="0 0 240 70" xmlns="http://www.w3.org/2000/svg"><defs><linearGradient id="hrg" x1="0" x2="1"><stop offset="0" stop-color="#FFB612"/><stop offset="1" stop-color="#D9501F"/></linearGradient></defs><line x1="0" x2="240" y1="35" y2="35" stroke="#5A5440" stroke-dasharray="2,3"/><text x="4" y="32" fill="#9A8E73" font-family="ui-monospace, monospace" font-size="8">162 BPM CAP</text><path d="M0 50 L40 47 L80 42 L120 36 L160 28 L200 22 L240 18" fill="none" stroke="url(#hrg)" stroke-width="2"/><circle cx="120" cy="36" r="3" fill="#FFB612"/><text x="125" y="33" fill="#FFB612" font-family="ui-monospace, monospace" font-size="8">M5 — ACT NOW</text></svg>'
+  },
+  {
+    scenario: 'I hit mile 13 at 1:46:00 — 2 minutes ahead of plan.',
+    response: 'Hold pace at 8:13. Do NOT bank more.',
+    why: 'You are 2 min ahead because Forbes was kinder than expected. The grind from 14–21 will reclaim 90 seconds of that whether you like it or not. <strong>Banked time on rolling terrain converts to bonk fuel</strong> — protect it, do not extend it.',
+    visual: '<table><thead><tr><th>SPLIT</th><th>PLAN</th><th>ACTUAL</th></tr></thead><tbody><tr><td>HALF</td><td>1:48:00</td><td style="color:#FFB612">1:46:00</td></tr><tr><td>+1 BANK</td><td>+0:00</td><td style="color:#7FA68C">−2:00</td></tr><tr><td>RECOVERY DRAIN</td><td>0:00</td><td style="color:#D9501F">+1:30</td></tr></tbody></table>'
+  },
+  {
+    scenario: 'I hit mile 13 at 1:50:00 — 2 minutes BEHIND plan.',
+    response: 'Switch cleanly to the 3:45 plan. Do not chase 3:35.',
+    why: 'Math: making up 2 min over the next 13 miles requires 9 sec/mi faster than goal pace through the hardest terrain of the race. That is a sub-3:35 effort with sub-3:38 fitness — and produces a 3:55 finish. <strong>A clean 3:43 is a better race than a chased 3:55.</strong>',
+    visual: '<table><thead><tr><th>STRATEGY</th><th>RESULT</th></tr></thead><tbody><tr><td>Chase 3:35</td><td style="color:#D9501F">3:55 (blow)</td></tr><tr><td>Switch to 3:45</td><td style="color:#7FA68C">3:43 (clean)</td></tr></tbody></table>'
+  },
+  {
+    scenario: 'I feel a side stitch developing at mile 8.',
+    response: 'Exhale forcefully on the opposite footstrike for 30 strides. Do not slow.',
+    why: 'Stitches are usually diaphragm spasms triggered by uneven breathing under load, not metabolic. Forced exhale on the opposite foot resets the breathing-stride coupling.',
+    visual: '<svg viewBox="0 0 240 60" xmlns="http://www.w3.org/2000/svg"><g font-family="ui-monospace, monospace" font-size="9" fill="#E8DFC9"><text x="4" y="14">L</text><text x="4" y="32">R</text><text x="4" y="50">EX</text></g><g><circle cx="40" cy="14" r="3" fill="#9A8E73"/><circle cx="80" cy="32" r="3" fill="#9A8E73"/><circle cx="120" cy="14" r="3" fill="#9A8E73"/><circle cx="160" cy="32" r="5" fill="#FFB612"/><circle cx="200" cy="14" r="3" fill="#9A8E73"/></g><g><line x1="160" x2="160" y1="38" y2="50" stroke="#FFB612"/><text x="148" y="58" fill="#FFB612" font-family="ui-monospace, monospace" font-size="8">EXHALE</text></g></svg>'
+  },
+  {
+    scenario: 'My quads start screaming on the descent at mile 22.',
+    response: 'Shorten stride, raise cadence to 182+, accept a 5–10 sec/mi pace cost.',
+    why: 'Quad damage on long descents is eccentric overload — and it compounds non-linearly. <strong>Pay 30 seconds at 22 to save 90 seconds at 26.</strong>',
+    visual: '<table><thead><tr><th>CADENCE</th><th>QUAD LOAD</th></tr></thead><tbody><tr><td>172 spm</td><td style="color:#D9501F">HIGH (long stride)</td></tr><tr><td>178 spm</td><td style="color:#C9A14A">MEDIUM</td></tr><tr><td>182+ spm</td><td style="color:#7FA68C">LOW (target)</td></tr></tbody></table>'
+  },
+  {
+    scenario: 'My GPS pace is bouncing wildly between buildings downtown.',
+    response: 'Switch the watch field to lap pace, not instant pace. Trust mile splits only.',
+    why: 'Instant GPS pace can swing 30 sec/mi in urban canyons due to multipath signal reflection. <strong>Lap-average pace is calibrated; trust it.</strong>',
+    visual: '<svg viewBox="0 0 240 60" xmlns="http://www.w3.org/2000/svg"><text x="4" y="12" fill="#9A8E73" font-family="ui-monospace, monospace" font-size="8">INSTANT</text><polyline points="60,16 75,8 90,22 105,4 120,20 135,10 150,28 165,6 180,18 195,12 210,22 225,8" fill="none" stroke="#D9501F" stroke-width="1.5"/><text x="4" y="50" fill="#9A8E73" font-family="ui-monospace, monospace" font-size="8">LAP AVG</text><line x1="60" x2="230" y1="45" y2="45" stroke="#7FA68C" stroke-width="2"/></svg>'
+  },
+  {
+    scenario: 'It\'s warmer than forecast — 72°F by mile 15.',
+    response: 'Add 8–12 sec/mi to all pace targets. Drink 25% more.',
+    why: 'Above 65°F, marathon pace cost rises ~3–5 sec/mi per 5°F. <strong>Heat-adjust early — by mile 15 the damage is irreversible by mile 22.</strong>',
+    visual: '<table><thead><tr><th>TEMP</th><th>PACE ADJ</th></tr></thead><tbody><tr><td>≤65°F</td><td style="color:#7FA68C">8:13 (target)</td></tr><tr><td>70°F</td><td style="color:#C9A14A">+5 sec/mi</td></tr><tr><td>72°F</td><td style="color:#D9501F">+8–12 sec/mi</td></tr><tr><td>78°F</td><td style="color:#B8401C">+20 sec/mi</td></tr></tbody></table>'
+  },
+  {
+    scenario: 'I feel amazing at mile 16. Should I push?',
+    response: 'No. Hold pace and RPE. Re-evaluate at mile 22.',
+    why: 'Feeling great at mile 16 is a delayed-onset signal. The cost of a mile 16 surge is paid at mile 23. <strong>If you still feel amazing at mile 22, that is the green light.</strong>',
+    visual: '<svg viewBox="0 0 240 60" xmlns="http://www.w3.org/2000/svg"><line x1="0" x2="240" y1="50" y2="50" stroke="#5A5440"/><text x="4" y="12" fill="#9A8E73" font-family="ui-monospace, monospace" font-size="8">M16 SURGE</text><path d="M30 38 L70 22 L110 25 L150 35 L190 50 L230 56" fill="none" stroke="#D9501F" stroke-width="2"/><circle cx="70" cy="22" r="3" fill="#FFB612"/><text x="75" y="19" fill="#FFB612" font-family="ui-monospace, monospace" font-size="7">SURGE</text><circle cx="190" cy="50" r="3" fill="#D9501F"/><text x="160" y="58" fill="#D9501F" font-family="ui-monospace, monospace" font-size="7">CRATER M23</text></svg>'
+  }
+];
+
+/* =============================================================
+   ELEVATION PROFILE — layered ridge silhouettes (Joy Division)
+   ============================================================= */
+function buildElevation() {
+  const svg = document.getElementById('elevSvg');
+  const W = 1600, H = 520;
+
+  // Ensure 132 elevation samples (0.0 → 26.2 step 0.2)
+  // We have 131; pad if needed
+  const samples = ELEV.slice();
+  while (samples.length < 132) samples.push(samples[samples.length-1]);
+
+  const minE = Math.min(...samples);
+  const maxE = Math.max(...samples);
+  const range = maxE - minE;
+
+  // Convert sample index to x
+  const x = (i) => (i / (samples.length - 1)) * W;
+  // Map elevation to y (with padding)
+  const yTop = 60, yBot = H - 50;
+  const y = (e) => yBot - ((e - minE) / range) * (yBot - yTop);
+
+  // Build path
+  const pathPoints = samples.map((e,i) => `${x(i).toFixed(2)},${y(e).toFixed(2)}`);
+  const mainPath = `M ${pathPoints.join(' L ')}`;
+  const fillPath = `${mainPath} L ${W},${yBot} L 0,${yBot} Z`;
+
+  // Layered ridge silhouettes — 5 offset copies behind the main, each darker
+  const layers = [];
+  for (let li = 5; li >= 1; li--) {
+    const dx = li * 8;
+    const dy = li * 12;
+    const opacity = 0.10 + li * 0.04;
+    const offsetPts = samples.map((e,i) =>
+      `${(x(i) - dx).toFixed(2)},${(y(e) + dy).toFixed(2)}`
+    );
+    const lp = `M ${offsetPts.join(' L ')} L ${W - dx},${yBot} L ${-dx},${yBot} Z`;
+    layers.push(`<path d="${lp}" fill="url(#ridgeFade${li})" opacity="${opacity}"/>`);
+  }
+
+  // Zone gradient stops along x
+  const zoneStops = ZONES.map(z => {
+    const t1 = (z.startMi / 26.2) * 100;
+    const t2 = (z.endMi / 26.2) * 100;
+    return `<stop offset="${t1}%" stop-color="${z.color}"/><stop offset="${t2}%" stop-color="${z.color}"/>`;
+  }).join('');
+
+  // Contour topographic lines (faint horizontal lines at elevation intervals)
+  const contourLines = [];
+  for (let e = Math.ceil(minE/50)*50; e <= maxE; e += 50) {
+    const yy = y(e);
+    contourLines.push(`<line x1="0" x2="${W}" y1="${yy}" y2="${yy}" stroke="rgba(255,182,18,0.06)" stroke-dasharray="2,4"/>`);
+    contourLines.push(`<text x="6" y="${yy-3}" fill="rgba(255,182,18,0.35)" font-family="ui-monospace, monospace" font-size="9" letter-spacing="0.1em">${e}FT</text>`);
+  }
+
+  // Mile tick marks
+  const ticks = [];
+  for (let mi = 0; mi <= 26; mi++) {
+    const tx = (mi / 26.2) * W;
+    const major = mi % 5 === 0;
+    ticks.push(`<line x1="${tx}" x2="${tx}" y1="${yBot}" y2="${yBot + (major?12:6)}" stroke="rgba(255,182,18,${major?0.5:0.25})"/>`);
+    if (major) {
+      ticks.push(`<text x="${tx}" y="${yBot+26}" fill="rgba(232,223,201,0.7)" font-family="ui-monospace, monospace" font-size="11" text-anchor="middle" letter-spacing="0.1em">M${mi}</text>`);
+    }
+  }
+
+  // Landmark callouts
+  const landmarks = [
+    { mi: 3.4, label: 'PNC PARK' },
+    { mi: 6.4, label: 'WEST END BR' },
+    { mi: 11.4, label: 'FORBES PEAK' },
+    { mi: 12.6, label: 'SCHENLEY' },
+    { mi: 16.5, label: 'FRICK ESTATE' },
+    { mi: 18.5, label: 'BLOOMFIELD' },
+    { mi: 26.2, label: 'FINISH' }
+  ];
+  const landmarkMarks = landmarks.map(l => {
+    const tx = (l.mi / 26.2) * W;
+    // Find elevation at this mile
+    const idx = Math.round((l.mi / 26.2) * (samples.length - 1));
+    const ty = y(samples[idx]);
+    return `
+      <line x1="${tx}" y1="${ty}" x2="${tx}" y2="${yTop - 6}" stroke="rgba(255,182,18,0.5)" stroke-dasharray="2,3"/>
+      <circle cx="${tx}" cy="${ty}" r="3" fill="var(--gold)" stroke="var(--ink)" stroke-width="1.5"/>
+      <text x="${tx}" y="${yTop - 12}" fill="rgba(255,182,18,0.85)" font-family="ui-monospace, monospace" font-size="9" text-anchor="middle" letter-spacing="0.15em">${l.label}</text>
+    `;
+  }).join('');
+
+  // Crucible band highlight
+  const crucibleX1 = (11/26.2) * W;
+  const crucibleX2 = (13/26.2) * W;
+
+  svg.innerHTML = `
+    <defs>
+      <linearGradient id="zoneGrad" x1="0" y1="0" x2="1" y2="0">
+        ${zoneStops}
+      </linearGradient>
+      <linearGradient id="fillGrad" x1="0" y1="0" x2="0" y2="1">
+        <stop offset="0%" stop-color="rgba(255,182,18,0.15)"/>
+        <stop offset="60%" stop-color="rgba(217,80,31,0.06)"/>
+        <stop offset="100%" stop-color="rgba(10,14,19,0.0)"/>
+      </linearGradient>
+      ${[1,2,3,4,5].map(li => `
+        <linearGradient id="ridgeFade${li}" x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0%" stop-color="${li > 3 ? '#1a2230' : '#243042'}"/>
+          <stop offset="100%" stop-color="rgba(10,14,19,0)"/>
+        </linearGradient>
+      `).join('')}
+      <filter id="glow" x="-20%" y="-20%" width="140%" height="140%">
+        <feGaussianBlur stdDeviation="2" result="b"/>
+        <feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge>
+      </filter>
+    </defs>
+
+    <!-- contour grid -->
+    <g class="contours">${contourLines.join('')}</g>
+
+    <!-- ridge silhouettes (layered behind, joy division style) -->
+    <g class="ridges">${layers.join('')}</g>
+
+    <!-- crucible band -->
+    <rect x="${crucibleX1}" y="${yTop-20}" width="${crucibleX2-crucibleX1}" height="${yBot-yTop+20}" fill="rgba(217,80,31,0.10)"/>
+    <text x="${(crucibleX1+crucibleX2)/2}" y="${yTop-26}" fill="#FF7E45" font-family="ui-monospace, monospace" font-size="10" text-anchor="middle" letter-spacing="0.2em" font-weight="600">⚠ THE CRUCIBLE</text>
+
+    <!-- main fill -->
+    <path d="${fillPath}" fill="url(#fillGrad)"/>
+
+    <!-- main ridge stroke colored by zone -->
+    <path d="${mainPath}" fill="none" stroke="url(#zoneGrad)" stroke-width="2.5" stroke-linejoin="round" stroke-linecap="round" filter="url(#glow)"/>
+
+    <!-- Mile ticks + axis -->
+    <line x1="0" y1="${yBot}" x2="${W}" y2="${yBot}" stroke="rgba(255,182,18,0.4)" stroke-width="1"/>
+    <g>${ticks.join('')}</g>
+
+    <!-- landmark markers -->
+    <g>${landmarkMarks}</g>
+
+    <!-- hover crosshair -->
+    <line id="elevCross" x1="-10" x2="-10" y1="${yTop-20}" y2="${yBot}" stroke="var(--gold)" stroke-width="1" stroke-dasharray="3,3" opacity="0"/>
+    <circle id="elevDot" cx="-10" cy="-10" r="6" fill="var(--gold)" stroke="var(--ink)" stroke-width="2" opacity="0" filter="url(#glow)"/>
+  `;
+
+  // Build zone strip below
+  const zoneStrip = document.getElementById('elevZones');
+  zoneStrip.innerHTML = ZONES.map(z => {
+    const w = (z.endMi - z.startMi) / 26.2 * 100;
+    return `<div class="z" style="flex: ${z.endMi - z.startMi}; background:${z.color}" data-zone="${z.id}">
+      ${z.id} · ${z.name}
+    </div>`;
+  }).join('');
+
+  // Hover interaction
+  setupElevHover(svg, samples, x, y, W, H, yTop, yBot, minE, maxE);
+
+  // Click on zone strip → expand zone card
+  zoneStrip.querySelectorAll('.z').forEach(el => {
+    el.addEventListener('click', () => {
+      const zid = el.dataset.zone;
+      document.querySelector(`.zone-card[data-zone="${zid}"]`)?.click();
+      document.querySelector(`.zone-card[data-zone="${zid}"]`)?.scrollIntoView({behavior:'smooth', block:'start'});
+    });
+  });
+}
+
+function setupElevHover(svg, samples, x, y, W, H, yTop, yBot, minE, maxE) {
+  const cross = document.getElementById('elevCross');
+  const dot = document.getElementById('elevDot');
+  const readout = document.getElementById('elevReadout');
+
+  // initialize at mile 0
+  updateReadout(0, samples);
+
+  function updateReadout(mile, samples) {
+    const idx = Math.max(0, Math.min(samples.length - 1, Math.round((mile/26.2) * (samples.length-1))));
+    const elev = samples[idx];
+    // grade from neighboring samples
+    const prev = samples[Math.max(0, idx - 1)];
+    const next = samples[Math.min(samples.length-1, idx + 1)];
+    const dyFt = next - prev;
+    const dxFt = 0.4 * 5280; // 0.4 mi between prev and next
+    const grade = (dyFt / dxFt) * 100;
+
+    // find zone
+    const zone = ZONES.find(z => mile >= z.startMi && mile < z.endMi) || ZONES[ZONES.length - 1];
+
+    // RPE / pace from zone
+    document.getElementById('erMile').innerHTML = `MI ${mile.toFixed(1)}<span class="small">/26.2</span>`;
+    document.getElementById('erZone').textContent = `${zone.id} · ${zone.name}`;
+    document.getElementById('erElev').textContent = `${Math.round(elev)} ft`;
+    document.getElementById('erGrade').textContent = `${grade >= 0 ? '+' : ''}${grade.toFixed(1)} %`;
+    document.getElementById('erRpe').textContent = zone.rpeText;
+    document.getElementById('erPace').textContent = zone.paceA;
+
+    // fueling cue — find closest fuel marker within 0.6 mi
+    const close = FUEL.reduce((best, f) => {
+      const d = Math.abs(f.mi - mile);
+      return d < best.d ? { f, d } : best;
+    }, { f: null, d: 999 });
+    let cue = close.d <= 0.6 ? close.f.title : (
+      mile >= 11 && mile <= 13 ? '⚠ NO FUEL · climb' :
+      mile >= 21 ? 'No more fuel · finish'  :
+      'Run on cadence'
+    );
+    document.getElementById('erFuel').textContent = cue;
+
+    // crosshair position
+    const xx = (mile / 26.2) * W;
+    const yy = y(elev);
+    cross.setAttribute('x1', xx);
+    cross.setAttribute('x2', xx);
+    cross.setAttribute('opacity', '0.7');
+    dot.setAttribute('cx', xx);
+    dot.setAttribute('cy', yy);
+    dot.setAttribute('opacity', '1');
+  }
+
+  function pointerToMile(evt) {
+    const rect = svg.getBoundingClientRect();
+    const cx = (evt.touches ? evt.touches[0].clientX : evt.clientX) - rect.left;
+    const ratio = Math.max(0, Math.min(1, cx / rect.width));
+    return ratio * 26.2;
+  }
+
+  svg.addEventListener('mousemove', (e) => {
+    const mi = pointerToMile(e);
+    updateReadout(mi, samples);
+  });
+  svg.addEventListener('touchmove', (e) => {
+    e.preventDefault();
+    const mi = pointerToMile(e);
+    updateReadout(mi, samples);
+  }, { passive: false });
+  svg.addEventListener('mouseleave', () => {
+    updateReadout(0, samples);
+    cross.setAttribute('opacity', '0');
+    dot.setAttribute('opacity', '0');
+  });
+
+  // initial show
+  cross.setAttribute('opacity', '0');
+  dot.setAttribute('opacity', '0');
+}
+
+/* =============================================================
+   ZONE CARDS — accordion
+   ============================================================= */
+function buildZones() {
+  const grid = document.getElementById('zonesGrid');
+  grid.innerHTML = ZONES.map(z => `
+    <div class="zone-card" data-zone="${z.id}" style="--zc:${z.color}">
+      <div class="zone-head">
+        <div class="znum">ZONE · ${z.num}</div>
+        <div class="ztitle">${z.name}<span class="miles">MILES ${z.miles}</span></div>
+        <div class="ztarget">RPE TARGET<strong>${z.rpeText}</strong></div>
+        <div class="ztarget">PACE · A-GOAL<strong>${z.paceA}</strong></div>
+        <div class="chev">›</div>
+      </div>
+      <div class="zone-body">
+        <div class="zone-body-inner">
+          ${z.atlWarning ? `
+            <div class="atl-warning">
+              <div class="wh">ATL WARNING · DO NOT REPEAT</div>
+              <p>You ran ATL at <strong>7:18 pace through the half</strong> — 30 sec/mi too hot. Mile 20 was 8:05; the finish was 8:32. <strong>The damage was done in this exact zone.</strong> The legs always feel great in mile 1. That is biology, not signal. The fitness that produces 7:50 is not the fitness that produces 7:50 for 26 miles.</p>
+            </div>
+          ` : ''}
+
+          <div>
+            <h4>Terrain</h4>
+            <p>${z.terrain}</p>
+            <h4>Effort Targets</h4>
+            <ul>
+              <li><strong>RPE</strong> — ${z.rpeText}</li>
+              <li><strong>HR</strong> — ${z.hrText}</li>
+              <li><strong>A-Goal Pace</strong> — ${z.paceA}</li>
+              <li><strong>B-Goal Pace</strong> — ${z.paceB}</li>
+            </ul>
+          </div>
+          <div>
+            <h4>Physiological Rationale</h4>
+            <p>${z.physio}</p>
+            <h4>Execution Rules</h4>
+            <ul>
+              ${z.rules.map(r => `<li>${r}</li>`).join('')}
+            </ul>
+          </div>
+
+          <div class="landmarks">
+            <div class="lh">Landmark Callouts</div>
+            <div class="lm">
+              ${z.landmarks.map(([m, name]) => `<span><em>${m}</em>${name}</span>`).join('')}
+            </div>
+          </div>
+
+          <div class="decision">
+            <div class="label">Decision Rule</div>
+            <p>“${z.decision}”</p>
+          </div>
+        </div>
+      </div>
+    </div>
+  `).join('');
+
+  grid.querySelectorAll('.zone-card').forEach(card => {
+    card.querySelector('.zone-head').addEventListener('click', () => {
+      card.classList.toggle('open');
+    });
+  });
+}
+
+/* =============================================================
+   FUELING TIMELINE
+   ============================================================= */
+function buildFuel() {
+  const track = document.getElementById('fuelTrack');
+  const W = 1800;
+
+  // ticks every mile
+  let html = '';
+  for (let m = 0; m <= 26; m++) {
+    const px = (m / 26.2) * W;
+    html += `<div class="fuel-tick" style="left:${px}px"><div class="lbl">M${m}</div></div>`;
+  }
+
+  FUEL.forEach((f, i) => {
+    const px = (f.mi / 26.2) * W;
+    const icon = f.type === 'water' ? 'H₂O' :
+                 f.type === 'banana' ? 'BAN' :
+                 f.type === 'danger' ? '✕' :
+                 f.type === 'gel' ? `G${FUEL.slice(0,i+1).filter(x=>x.type==='gel').length}` : '·';
+    html += `
+      <div class="fuel-marker ${f.type}" style="left:${px}px" data-idx="${i}">
+        <div class="icon">${icon}</div>
+        <div class="pin">M ${f.mi.toFixed(1)}</div>
+      </div>
+    `;
+  });
+
+  track.innerHTML = `
+    <div class="fuel-axis"></div>
+    ${html}
+  `;
+
+  track.querySelectorAll('.fuel-marker').forEach(m => {
+    m.addEventListener('click', () => {
+      track.querySelectorAll('.fuel-marker').forEach(x => x.classList.remove('active'));
+      m.classList.add('active');
+      const f = FUEL[+m.dataset.idx];
+      document.getElementById('fdTitle').textContent = f.title;
+      document.getElementById('fdMeta').textContent = `MILE ${f.mi.toFixed(1)} · ${f.type.toUpperCase()}`;
+      document.getElementById('fdBody').innerHTML = f.body;
+    });
+  });
+
+  // auto-select first gel for initial state
+  const firstGel = track.querySelector('.fuel-marker.gel');
+  if (firstGel) firstGel.click();
+}
+
+/* =============================================================
+   WRISTBAND
+   ============================================================= */
+// Build per-mile pace plan for 3:35 target
+// Cumulative time = sum of mile splits
+function buildWristbandData() {
+  // mile-by-mile pace based on zone targets
+  // 26 miles + final 0.2
+  const splits = [
+    // Z1 settle — 0-3 conservative
+    { mi: 1, pace: '8:30', rpe: 4, cue: 'SETTLE · sip H₂O' },
+    { mi: 2, pace: '8:25', rpe: 4, cue: 'Hold leash' },
+    { mi: 3, pace: '8:20', rpe: 4, cue: 'PNC Park ahead' },
+    // Z2 cruise
+    { mi: 4, pace: '8:15', rpe: 4, cue: 'GEL #1 · 25g', fuel: true },
+    { mi: 5, pace: '8:13', rpe: 4, cue: 'Heinz Field' },
+    { mi: 6, pace: '8:13', rpe: 4, cue: 'Lock RPE 4' },
+    // Z3 river roll
+    { mi: 7, pace: '8:13', rpe: 4, cue: 'GEL #2 · S Side', fuel: true },
+    { mi: 8, pace: '8:10', rpe: 5, cue: 'Carson St · steady' },
+    { mi: 9, pace: '8:13', rpe: 5, cue: 'Drink up · climb soon' },
+    { mi: 10, pace: '8:18', rpe: 5, cue: 'Birmingham Br' },
+    // Z4 approach
+    { mi: 11, pace: '8:30', rpe: 5, cue: 'Forbes begins · short stride' },
+    // Z5 crucible
+    { mi: 12, pace: '9:20', rpe: 6, cue: 'CRUCIBLE · climb on RPE', crucible: true },
+    { mi: 13, pace: '8:30', rpe: 6, cue: 'Schenley · DO NOT SURGE', crucible: true },
+    // Z6 grind
+    { mi: 14, pace: '8:10', rpe: 6, cue: 'GEL #3 · Shadyside', fuel: true },
+    { mi: 15, pace: '8:15', rpe: 6, cue: 'Form check · shoulders' },
+    { mi: 16, pace: '8:15', rpe: 6, cue: 'Frick Estate' },
+    { mi: 17, pace: '8:25', rpe: 7, cue: 'GEL #4 · CAFFEINE', fuel: true },
+    { mi: 18, pace: '8:20', rpe: 7, cue: 'Bloomfield Br · low point' },
+    { mi: 19, pace: '8:20', rpe: 7, cue: '½ banana if calm' },
+    { mi: 20, pace: '8:20', rpe: 7, cue: 'GEL #5 · grind on', fuel: true },
+    { mi: 21, pace: '8:15', rpe: 7, cue: 'Highland · descent next' },
+    // Z7 home
+    { mi: 22, pace: '8:00', rpe: 8, cue: 'GEL #6 · CAFFEINE FINAL', fuel: true },
+    { mi: 23, pace: '7:55', rpe: 8, cue: 'Strip descent · cadence 180+' },
+    { mi: 24, pace: '8:00', rpe: 9, cue: 'Boulevard · push begins' },
+    { mi: 25, pace: '7:55', rpe: 9, cue: 'Trust the plan' },
+    { mi: 26, pace: '7:50', rpe: 10, cue: 'COVER WATCH · run' },
+    { mi: '.2', pace: '7:45', rpe: 10, cue: 'FINISH · Point State Pk', last: true }
+  ];
+  // compute cumulative time
+  let cumSec = 0;
+  splits.forEach(s => {
+    const [m, sc] = s.pace.split(':').map(Number);
+    let secThisMile = m * 60 + sc;
+    if (s.last) secThisMile = secThisMile * 0.2;
+    cumSec += secThisMile;
+    s.cumSec = cumSec;
+  });
+  return splits;
+}
+
+function fmtCum(sec) {
+  const h = Math.floor(sec/3600);
+  const m = Math.floor((sec%3600)/60);
+  const s = Math.floor(sec%60);
+  return `${h}:${String(m).padStart(2,'0')}:${String(s).padStart(2,'0')}`;
+}
+
+function buildWristband() {
+  const data = buildWristbandData();
+  const strip = document.getElementById('wbStrip');
+  const printWb = document.getElementById('printWb');
+
+  const headerHtml = `
+    <div class="wb-h">
+      <div class="pgh">PGH MARATHON</div>
+      <div class="tgt">A-GOAL · <strong>3:35:00</strong> · 8:13/MI</div>
+    </div>
+  `;
+  const tableHead = `
+    <div class="wb-row head">
+      <div class="m">M</div>
+      <div class="pace">PACE</div>
+      <div class="rpe">RPE</div>
+      <div class="cue">SPLIT · CUE</div>
+    </div>
+  `;
+  const rows = data.map(s => {
+    const cls = [];
+    if (s.crucible) cls.push('crucible');
+    if (s.fuel) cls.push('fuel');
+    return `
+      <div class="wb-row ${cls.join(' ')}">
+        <div class="m">${s.mi}</div>
+        <div class="pace">${s.pace}</div>
+        <div class="rpe">${s.rpe}</div>
+        <div class="cue"><strong>${fmtCum(s.cumSec)}</strong> · ${s.cue}</div>
+      </div>
+    `;
+  }).join('');
+
+  const footerHtml = `<div class="wb-f">EFFORT &gt; PACE · RUN THE COURSE</div>`;
+
+  strip.innerHTML = headerHtml + tableHead + rows + footerHtml;
+  printWb.innerHTML = headerHtml + tableHead + rows + footerHtml;
+}
+
+/* =============================================================
+   IF / THEN
+   ============================================================= */
+function buildIfThen() {
+  const grid = document.getElementById('ifthenGrid');
+  grid.innerHTML = IFTHEN.map((it, i) => `
+    <div class="ifthen-card reveal" data-i="${i}">
+      <div class="ifthen-inner">
+        <div class="ifthen-face front">
+          <div>
+            <div class="lbl">SCENARIO ${String(i+1).padStart(2,'0')} · IF</div>
+            <div class="scenario">${it.scenario}</div>
+          </div>
+          <div class="flip-hint">↦ TAP TO REVEAL RESPONSE</div>
+        </div>
+        <div class="ifthen-face back">
+          <div class="lbl">RESPONSE · THEN</div>
+          <div class="response">${it.response}</div>
+          <div class="why"><strong>Why:</strong> ${it.why}</div>
+          ${it.visual ? `<div class="visual">${it.visual}</div>` : ''}
+          <div class="flip-hint">↩ TAP TO RETURN</div>
+        </div>
+      </div>
+    </div>
+  `).join('');
+
+  grid.querySelectorAll('.ifthen-card').forEach(card => {
+    card.addEventListener('click', () => card.classList.toggle('flipped'));
+  });
+}
+
+/* =============================================================
+   HERO TOPO BACKGROUND — animated contour-style ridges
+   ============================================================= */
+function buildHeroTopo() {
+  const svg = document.getElementById('heroTopo');
+  const W = 1600, H = 900;
+  let html = '<defs><linearGradient id="topoG" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stop-color="#FFB612" stop-opacity="0.04"/><stop offset="100%" stop-color="#FFB612" stop-opacity="0.18"/></linearGradient></defs>';
+
+  // 8 layered ridge silhouettes mimicking the actual elevation profile
+  const samples = ELEV;
+  const minE = Math.min(...samples), maxE = Math.max(...samples), range = maxE - minE;
+
+  for (let layer = 0; layer < 12; layer++) {
+    const offsetY = 200 + layer * 50;
+    const amplify = 1 + layer * 0.05;
+    const points = samples.map((e, i) => {
+      const x = (i / (samples.length - 1)) * W;
+      const y = offsetY + ((maxE - e) / range) * 180 * amplify;
+      return `${x.toFixed(1)},${y.toFixed(1)}`;
+    });
+    const opacity = 0.15 + (layer * 0.04);
+    html += `<polyline points="${points.join(' ')}" fill="none" stroke="rgba(255,182,18,${opacity * 0.5})" stroke-width="${1 + layer*0.1}"/>`;
+  }
+
+  // contour rings (concentric topo rings near top-right where the "peak" is)
+  for (let r = 60; r <= 360; r += 40) {
+    html += `<circle cx="1300" cy="240" r="${r}" fill="none" stroke="rgba(255,182,18,0.06)" stroke-dasharray="${r > 200 ? '0' : '3,4'}"/>`;
+  }
+  // benchmark X
+  html += `<g transform="translate(1300,240)">
+    <circle r="4" fill="#FFB612"/>
+    <line x1="-12" x2="12" y1="0" y2="0" stroke="rgba(255,182,18,0.6)"/>
+    <line x1="0" x2="0" y1="-12" y2="12" stroke="rgba(255,182,18,0.6)"/>
+    <text x="18" y="4" fill="rgba(255,182,18,0.6)" font-family="ui-monospace, monospace" font-size="10" letter-spacing="0.2em">FORBES PK · 920FT</text>
+  </g>`;
+
+  svg.innerHTML = html;
+}
+
+/* =============================================================
+   PRINT
+   ============================================================= */
+function setupPrint() {
+  document.getElementById('printBtn').addEventListener('click', () => {
+    document.body.classList.add('printing');
+    setTimeout(() => {
+      window.print();
+      setTimeout(() => document.body.classList.remove('printing'), 300);
+    }, 100);
+  });
+  // also clean up if user cancels print
+  window.addEventListener('afterprint', () => {
+    document.body.classList.remove('printing');
+  });
+}
+
+/* =============================================================
+   PARALLAX TOPO BACKGROUND + SECTION-AWARE PULSE
+   -------------------------------------------------------------
+   NOTES
+   (1) ACTIVE-AT-LOAD: #hero is active on first paint. The
+       observer fires on intersect, so initial paint is set
+       imperatively from setActiveSection('hero') in init.
+   (2) ADDING A NEW SECTION: append { id, color, pulse } to
+       SECTION_MAP, then add an id="..." attribute to the
+       matching <section>. The same observer instance picks
+       it up automatically — no other wiring needed.
+   (3) OPTIMIZATION SKIPPED: a per-line CSS variable cascade
+       (one var per contour) was considered for staggered
+       color transitions. Skipped because a single inherited
+       var on the parent SVG keeps repaints to one layer and
+       avoids 14 simultaneous transition timers — cheaper on
+       a phone GPU race-morning.
+   (4) SYNC: contour stroke and pulse div both read from
+       :root custom properties (--active-zone, --pulse-color).
+       One observer write per section change → both layers
+       repaint together, never out of phase.
+   ============================================================= */
+
+const SECTION_MAP = {
+  hero:      { color: '#4A6FA5', pulse: 'transparent' },
+  elevation: { color: '#7FA68C', pulse: 'transparent' },
+  zones:     { color: '#C9A14A', pulse: 'transparent' },
+  fuel:      { color: '#C9A14A', pulse: 'transparent' },
+  wristband: { color: '#B8401C', pulse: 'radial-gradient(ellipse at center, rgba(184,64,28,0.10) 0%, transparent 70%)' },
+  ifthen:    { color: '#B8401C', pulse: 'radial-gradient(ellipse at center, rgba(184,64,28,0.10) 0%, transparent 70%)' },
+  coach:     { color: '#FFB612', pulse: 'radial-gradient(ellipse at center, rgba(255,182,18,0.12) 0%, transparent 65%)' }
+};
+
+// Crucible (Z5/Z6 cards) — independently observed for the heat-bleed pulse
+const CRUCIBLE_PULSE = {
+  Z5: { color: '#D9501F', pulse: 'radial-gradient(ellipse at center, rgba(217,80,31,0.12) 0%, transparent 70%)' },
+  Z6: { color: '#B8401C', pulse: 'radial-gradient(ellipse at center, rgba(184,64,28,0.18) 0%, transparent 70%)' }
+};
+
+function buildTopoBackground() {
+  const svg = document.getElementById('topo-bg');
+  const W = 1600, H = 1000;
+  // 14 contour lines as organic sine-based paths.
+  // Density biased lower = more lines clustered toward viewport bottom
+  // for atmospheric depth. Lower lines also slightly more opaque.
+  const lines = [];
+  const COUNT = 14;
+  for (let i = 0; i < COUNT; i++) {
+    const t = i / (COUNT - 1);                  // 0 → 1 top → bottom
+    const y0 = 60 + t * (H - 80);
+    // Each line: 80 sample points across width, sine-perturbed
+    const amp1 = 18 + (i % 3) * 8;
+    const amp2 = 10 + (i % 4) * 5;
+    const f1 = 0.0035 + i * 0.0003;
+    const f2 = 0.011 + i * 0.0006;
+    const phase = i * 0.7;
+    const pts = [];
+    for (let x = 0; x <= W; x += 20) {
+      const y = y0
+        + Math.sin(x * f1 + phase) * amp1
+        + Math.sin(x * f2 + phase * 1.3) * amp2;
+      pts.push(`${x},${y.toFixed(1)}`);
+    }
+    // opacity: bottom lines more visible
+    const opacity = 0.06 + t * 0.12;            // 0.06 → 0.18
+    const sw = 0.8 + t * 0.4;                   // 0.8 → 1.2
+    lines.push(
+      `<path class="contour" d="M ${pts.join(' L ')}" stroke-width="${sw.toFixed(2)}" opacity="${opacity.toFixed(3)}" data-depth="${t.toFixed(2)}"/>`
+    );
+  }
+
+  // Extra dense lines that fade in only on red zones — appended last,
+  // hidden by default, revealed via opacity when crucible is active.
+  for (let i = 0; i < 6; i++) {
+    const t = i / 5;
+    const y0 = 200 + t * (H - 320);
+    const amp = 22 + i * 3;
+    const f = 0.006 + i * 0.0008;
+    const pts = [];
+    for (let x = 0; x <= W; x += 18) {
+      const y = y0 + Math.sin(x * f + i * 1.4) * amp + Math.sin(x * 0.018 + i) * 6;
+      pts.push(`${x},${y.toFixed(1)}`);
+    }
+    lines.push(
+      `<path class="contour contour--dense" d="M ${pts.join(' L ')}" stroke-width="0.9" opacity="0" data-depth="${t.toFixed(2)}"/>`
+    );
+  }
+
+  svg.innerHTML = lines.join('');
+}
+
+/* Parallax — translate the SVG vertically at 0.3× scroll.
+   Single rAF loop, no scroll listener storm. */
+function setupParallax() {
+  const svg = document.getElementById('topo-bg');
+  let target = 0;
+  let current = 0;
+  let ticking = false;
+
+  function onScroll() {
+    target = window.scrollY * 0.3;
+    if (!ticking) {
+      ticking = true;
+      requestAnimationFrame(tick);
+    }
+  }
+  function tick() {
+    // ease toward target for buttery feel
+    current += (target - current) * 0.18;
+    svg.style.transform = `translate3d(0, ${-current.toFixed(2)}px, 0)`;
+    if (Math.abs(target - current) > 0.1) {
+      requestAnimationFrame(tick);
+    } else {
+      current = target;
+      svg.style.transform = `translate3d(0, ${-current.toFixed(2)}px, 0)`;
+      ticking = false;
+    }
+  }
+  window.addEventListener('scroll', onScroll, { passive: true });
+  onScroll();
+}
+
+/* Single IntersectionObserver — drives both topo color and pulse. */
+function setupSectionObserver() {
+  const root = document.documentElement;
+  const ids = Object.keys(SECTION_MAP);
+  const targets = ids.map(id => document.getElementById(id)).filter(Boolean);
+
+  // also observe the Z5/Z6 zone cards for the crucible heat-bleed
+  const z5 = document.querySelector('.zone-card[data-zone="Z5"]');
+  const z6 = document.querySelector('.zone-card[data-zone="Z6"]');
+  const crucibleTargets = [z5, z6].filter(Boolean);
+
+  // tracking state
+  const visible = new Set();
+  const visibleCrucible = new Set();
+
+  function applyActive() {
+    // Crucible cards win (heat takes priority over base section)
+    if (visibleCrucible.has('Z6')) {
+      root.style.setProperty('--active-zone', CRUCIBLE_PULSE.Z6.color);
+      root.style.setProperty('--pulse-color', CRUCIBLE_PULSE.Z6.pulse);
+      document.body.classList.add('crucible-active');
+      return;
+    }
+    if (visibleCrucible.has('Z5')) {
+      root.style.setProperty('--active-zone', CRUCIBLE_PULSE.Z5.color);
+      root.style.setProperty('--pulse-color', CRUCIBLE_PULSE.Z5.pulse);
+      document.body.classList.add('crucible-active');
+      return;
+    }
+    document.body.classList.remove('crucible-active');
+
+    // pick the section closest to viewport center if multiple
+    let best = null, bestDist = Infinity;
+    visible.forEach(id => {
+      const el = document.getElementById(id);
+      if (!el) return;
+      const r = el.getBoundingClientRect();
+      const center = r.top + r.height / 2;
+      const dist = Math.abs(center - window.innerHeight / 2);
+      if (dist < bestDist) { bestDist = dist; best = id; }
+    });
+    if (!best) return;
+    const cfg = SECTION_MAP[best];
+    root.style.setProperty('--active-zone', cfg.color);
+    root.style.setProperty('--pulse-color', cfg.pulse);
+  }
+
+  /* rootMargin band — section is "active" when ANY of it intersects
+     a horizontal band centered in the viewport. This works for
+     sections of any height (a 0.3 threshold would fail on tall
+     sections where 30% > viewport height). The band is 40% tall,
+     so a section is active whenever it overlaps the middle 40% of
+     the viewport — equivalent to "crosses viewport center."
+     Multiple low thresholds ensure the callback fires as elements
+     enter/leave the band. */
+  const io = new IntersectionObserver((entries) => {
+    entries.forEach(e => {
+      const id = e.target.id;
+      const zoneId = e.target.dataset?.zone;
+      if (zoneId && (zoneId === 'Z5' || zoneId === 'Z6')) {
+        if (e.isIntersecting) visibleCrucible.add(zoneId);
+        else visibleCrucible.delete(zoneId);
+      } else if (id) {
+        if (e.isIntersecting) visible.add(id);
+        else visible.delete(id);
+      }
+    });
+    applyActive();
+  }, {
+    rootMargin: '-30% 0px -30% 0px',
+    threshold: [0, 0.01, 0.1, 0.5, 1]
+  });
+
+  targets.forEach(el => io.observe(el));
+  crucibleTargets.forEach(el => io.observe(el));
+
+  // initial paint — hero
+  root.style.setProperty('--active-zone', SECTION_MAP.hero.color);
+  root.style.setProperty('--pulse-color', SECTION_MAP.hero.pulse);
+}
+
+/* Crucible mode reveals dense contour layer for "steeper topo" feel */
+const crucibleStyle = document.createElement('style');
+crucibleStyle.textContent = `
+  body.crucible-active #topo-bg .contour--dense { opacity: 0.10 !important; }
+`;
+document.head.appendChild(crucibleStyle);
+
+/* =============================================================
+   SCENE STACK \u2014 generative SVG backgrounds per section
+   Each scene is a distinct atmospheric illustration that
+   crossfades when its section enters the viewport.
+   ============================================================= */
+const SCENES = {
+  // HERO — Pittsburgh pre-dawn: river reflections, full skyline, running silhouette
+  hero: () => `
+    <svg viewBox="0 0 1600 1000" preserveAspectRatio="xMidYMid slice">
+      <defs>
+        <linearGradient id="dawnSky_h" x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0%" stop-color="#0c1624"/>
+          <stop offset="35%" stop-color="#1c2d44"/>
+          <stop offset="65%" stop-color="#2e3c52"/>
+          <stop offset="100%" stop-color="#0a0e13"/>
+        </linearGradient>
+        <radialGradient id="sunRise" cx="0.68" cy="0.38" r="0.45">
+          <stop offset="0%" stop-color="#FF8C00" stop-opacity="0.55"/>
+          <stop offset="30%" stop-color="#FFB612" stop-opacity="0.22"/>
+          <stop offset="70%" stop-color="#1c2d44" stop-opacity="0.05"/>
+          <stop offset="100%" stop-color="#0a0e13" stop-opacity="0"/>
+        </radialGradient>
+        <linearGradient id="riverGrad" x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0%" stop-color="#1a3a5c" stop-opacity="0.7"/>
+          <stop offset="100%" stop-color="#0a0e13" stop-opacity="0.95"/>
+        </linearGradient>
+        <filter id="cityGlow">
+          <feGaussianBlur stdDeviation="3" result="b"/>
+          <feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge>
+        </filter>
+      </defs>
+      <rect width="1600" height="1000" fill="url(#dawnSky_h)"/>
+      <rect width="1600" height="1000" fill="url(#sunRise)"/>
+      <!-- Stars -->
+      <g opacity="0.6">
+        <circle cx="120" cy="80" r="1" fill="#E8DFC9"/>
+        <circle cx="245" cy="55" r="1.2" fill="#E8DFC9"/>
+        <circle cx="380" cy="110" r="0.8" fill="#E8DFC9"/>
+        <circle cx="510" cy="40" r="1" fill="#E8DFC9"/>
+        <circle cx="680" cy="90" r="0.9" fill="#E8DFC9"/>
+        <circle cx="820" cy="35" r="1.1" fill="#E8DFC9"/>
+        <circle cx="950" cy="75" r="0.8" fill="#E8DFC9"/>
+        <circle cx="1100" cy="50" r="1" fill="#E8DFC9"/>
+        <circle cx="1280" cy="95" r="1.2" fill="#E8DFC9"/>
+        <circle cx="1420" cy="40" r="0.8" fill="#E8DFC9"/>
+        <circle cx="170" cy="160" r="0.7" fill="#E8DFC9"/>
+        <circle cx="340" cy="185" r="0.9" fill="#E8DFC9"/>
+        <circle cx="580" cy="140" r="0.8" fill="#E8DFC9"/>
+        <circle cx="760" cy="175" r="1" fill="#E8DFC9"/>
+        <circle cx="1040" cy="155" r="0.7" fill="#E8DFC9"/>
+        <circle cx="1350" cy="170" r="0.9" fill="#E8DFC9"/>
+      </g>
+      <!-- Sun/Moon glow -->
+      <circle cx="1090" cy="380" r="28" fill="#FF8C00" opacity="0.55"/>
+      <circle cx="1090" cy="380" r="50" fill="#FFB612" opacity="0.18"/>
+      <circle cx="1090" cy="380" r="90" fill="#FFB612" opacity="0.07"/>
+      <!-- Pittsburgh skyline — detailed with distinct building shapes -->
+      <g fill="#06090e" filter="url(#cityGlow)">
+        <!-- US Steel Tower (tallest) -->
+        <rect x="720" y="360" width="44" height="440"/>
+        <polygon points="720,360 742,320 764,360"/>
+        <!-- PPG Place gothic spires -->
+        <rect x="500" y="430" width="36" height="370"/>
+        <polygon points="500,430 518,400 536,430"/>
+        <rect x="548" y="450" width="22" height="350"/>
+        <polygon points="548,450 559,428 570,450"/>
+        <!-- Grant Building -->
+        <rect x="430" y="470" width="56" height="330"/>
+        <!-- Gulf Tower -->
+        <rect x="620" y="390" width="40" height="410"/>
+        <polygon points="620,390 640,355 660,390"/>
+        <!-- BNY Mellon Center -->
+        <rect x="800" y="400" width="52" height="400"/>
+        <rect x="810" y="375" width="32" height="25"/>
+        <!-- Fifth Ave Place (circular top) -->
+        <rect x="870" y="430" width="38" height="370"/>
+        <ellipse cx="889" cy="430" rx="22" ry="14"/>
+        <!-- smaller buildings L -->
+        <rect x="300" y="510" width="50" height="290"/>
+        <rect x="360" y="530" width="40" height="270"/>
+        <rect x="175" y="560" width="60" height="240"/>
+        <rect x="245" y="540" width="44" height="260"/>
+        <!-- smaller buildings R -->
+        <rect x="930" y="500" width="46" height="300"/>
+        <rect x="988" y="520" width="38" height="280"/>
+        <rect x="1038" y="545" width="50" height="255"/>
+        <rect x="1100" y="560" width="44" height="240"/>
+        <rect x="1156" y="580" width="40" height="220"/>
+        <rect x="1208" y="600" width="35" height="200"/>
+        <!-- Point area low buildings -->
+        <rect x="100" y="620" width="80" height="180"/>
+        <rect x="1300" y="630" width="80" height="170"/>
+      </g>
+      <!-- Window lights scattered across skyline -->
+      <g fill="#FFB612" opacity="0.45">
+        <rect x="726" y="380" width="3" height="4"/><rect x="740" y="400" width="3" height="4"/>
+        <rect x="754" y="375" width="3" height="4"/><rect x="727" y="420" width="3" height="4"/>
+        <rect x="745" y="440" width="3" height="4"/><rect x="630" y="410" width="3" height="4"/>
+        <rect x="644" y="430" width="3" height="4"/><rect x="808" y="415" width="3" height="4"/>
+        <rect x="822" y="435" width="3" height="4"/><rect x="836" y="410" width="3" height="4"/>
+        <rect x="506" y="445" width="3" height="4"/><rect x="520" y="465" width="3" height="4"/>
+        <rect x="877" y="445" width="3" height="4"/><rect x="891" y="465" width="3" height="4"/>
+        <rect x="940" y="518" width="3" height="4"/><rect x="955" y="535" width="3" height="4"/>
+        <rect x="1042" y="562" width="3" height="4"/><rect x="1058" y="580" width="3" height="4"/>
+        <rect x="185" y="578" width="3" height="4"/><rect x="200" y="595" width="3" height="4"/>
+        <rect x="1310" y="648" width="3" height="4"/><rect x="1325" y="665" width="3" height="4"/>
+      </g>
+      <!-- Rivers (Allegheny + Monongahela converging at The Point) -->
+      <path d="M 0 800 Q 300 760 500 780 Q 680 800 780 820 Q 860 840 1600 820" fill="none" stroke="#3a6080" stroke-width="60" opacity="0.35"/>
+      <path d="M 780 820 Q 760 900 800 1000" fill="none" stroke="#3a6080" stroke-width="48" opacity="0.3"/>
+      <!-- River surface shimmer -->
+      <rect x="0" y="790" width="1600" height="210" fill="url(#riverGrad)"/>
+      <g stroke="#5B8CB8" stroke-width="1" fill="none" opacity="0.25">
+        <path d="M 80 830 Q 200 820 360 835 T 700 825"/>
+        <path d="M 120 850 Q 280 840 480 855 T 850 845"/>
+        <path d="M 200 870 Q 400 860 600 872 T 1000 865"/>
+        <path d="M 400 890 Q 600 880 800 890 T 1300 883"/>
+        <!-- sunrise reflection in water -->
+        <path d="M 900 820 Q 1000 850 980 880" stroke="#FF8C00" stroke-width="2" opacity="0.4"/>
+        <path d="M 950 825 Q 1040 860 1020 895" stroke="#FFB612" stroke-width="1.5" opacity="0.3"/>
+      </g>
+      <!-- Three Bridges silhouettes -->
+      <g stroke="#1a2a3f" stroke-width="8" fill="none" opacity="0.8">
+        <path d="M 260 780 Q 310 720 360 780"/>
+        <path d="M 360 780 Q 410 720 460 780"/>
+        <path d="M 460 780 Q 510 720 560 780"/>
+      </g>
+      <!-- Running silhouette at race start -->
+      <g transform="translate(140, 730) scale(0.9)" opacity="0.7" fill="#06090e">
+        <ellipse cx="20" cy="8" rx="9" ry="9"/>
+        <path d="M 20 17 L 16 42 L 10 65 M 20 17 L 24 42 L 32 62 M 20 30 L 8 38 M 20 30 L 34 36"/>
+      </g>
+      <!-- Spectator silhouettes at The Point -->
+      <g fill="#06090e" opacity="0.55">
+        <ellipse cx="350" cy="790" rx="8" ry="10"/><rect x="346" y="800" width="8" height="20"/>
+        <ellipse cx="375" cy="786" rx="8" ry="10"/><rect x="371" y="796" width="8" height="22"/>
+        <ellipse cx="400" cy="788" rx="8" ry="10"/><rect x="396" y="798" width="8" height="20"/>
+      </g>
+      <!-- Marathon bib number tag on a fence -->
+      <rect x="65" y="748" width="54" height="38" rx="2" fill="#E8DFC9" opacity="0.85"/>
+      <text x="92" y="763" fill="#0a0e13" font-family="ui-monospace,monospace" font-size="8" text-anchor="middle" letter-spacing="0.1em">BIB</text>
+      <text x="92" y="778" fill="#0a0e13" font-family="ui-monospace,monospace" font-size="12" text-anchor="middle" font-weight="700">PGH</text>
+    </svg>`,
+
+  // ELEVATION — The Roberto Clemente / Andy Warhol Bridge cables + river at golden hour
+  elevation: () => `
+    <svg viewBox="0 0 1600 1000" preserveAspectRatio="xMidYMid slice">
+      <defs>
+        <linearGradient id="bridgeSky_e" x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0%" stop-color="#141c28"/>
+          <stop offset="40%" stop-color="#1e2d40"/>
+          <stop offset="75%" stop-color="#243040"/>
+          <stop offset="100%" stop-color="#0a0e13"/>
+        </linearGradient>
+        <linearGradient id="waterRefl" x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0%" stop-color="#1a3550" stop-opacity="0.8"/>
+          <stop offset="100%" stop-color="#0a0e13" stop-opacity="1"/>
+        </linearGradient>
+        <filter id="cableGlow">
+          <feGaussianBlur stdDeviation="1.5" result="b"/>
+          <feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge>
+        </filter>
+      </defs>
+      <rect width="1600" height="1000" fill="url(#bridgeSky_e)"/>
+      <!-- Morning sky glow on horizon -->
+      <ellipse cx="800" cy="640" rx="700" ry="120" fill="#FF8C00" opacity="0.14"/>
+      <ellipse cx="800" cy="660" rx="500" ry="80" fill="#FFB612" opacity="0.10"/>
+      <!-- Three Sisters Bridges (self-anchored suspension) -->
+      <!-- Bridge 1 — leftmost -->
+      <g filter="url(#cableGlow)">
+        <rect x="180" y="590" width="20" height="240" fill="#1a2030" opacity="0.9"/>
+        <rect x="340" y="590" width="20" height="240" fill="#1a2030" opacity="0.9"/>
+        <rect x="160" y="618" width="220" height="12" fill="#1e2530" opacity="0.9"/>
+        <!-- cables fan from top of tower -->
+        <g stroke="#FFB612" stroke-width="1.2" opacity="0.55" fill="none">
+          <line x1="190" y1="592" x2="160" y2="630"/>
+          <line x1="190" y1="592" x2="175" y2="630"/>
+          <line x1="190" y1="592" x2="200" y2="630"/>
+          <line x1="190" y1="592" x2="230" y2="630"/>
+          <line x1="190" y1="592" x2="270" y2="630"/>
+          <line x1="190" y1="592" x2="310" y2="630"/>
+          <line x1="350" y1="592" x2="310" y2="630"/>
+          <line x1="350" y1="592" x2="330" y2="630"/>
+          <line x1="350" y1="592" x2="360" y2="630"/>
+          <line x1="350" y1="592" x2="375" y2="630"/>
+        </g>
+      </g>
+      <!-- Bridge 2 — center -->
+      <g filter="url(#cableGlow)">
+        <rect x="550" y="560" width="22" height="270" fill="#1a2030" opacity="0.9"/>
+        <rect x="730" y="560" width="22" height="270" fill="#1a2030" opacity="0.9"/>
+        <rect x="530" y="592" width="244" height="14" fill="#1e2530" opacity="0.9"/>
+        <g stroke="#FFB612" stroke-width="1.4" opacity="0.6" fill="none">
+          <line x1="561" y1="562" x2="530" y2="606"/>
+          <line x1="561" y1="562" x2="548" y2="606"/>
+          <line x1="561" y1="562" x2="570" y2="606"/>
+          <line x1="561" y1="562" x2="600" y2="606"/>
+          <line x1="561" y1="562" x2="640" y2="606"/>
+          <line x1="561" y1="562" x2="690" y2="606"/>
+          <line x1="741" y1="562" x2="690" y2="606"/>
+          <line x1="741" y1="562" x2="718" y2="606"/>
+          <line x1="741" y1="562" x2="752" y2="606"/>
+          <line x1="741" y1="562" x2="774" y2="606"/>
+        </g>
+      </g>
+      <!-- Bridge 3 — rightmost -->
+      <g filter="url(#cableGlow)">
+        <rect x="950" y="575" width="20" height="260" fill="#1a2030" opacity="0.9"/>
+        <rect x="1120" y="575" width="20" height="260" fill="#1a2030" opacity="0.9"/>
+        <rect x="930" y="605" width="232" height="13" fill="#1e2530" opacity="0.9"/>
+        <g stroke="#FFB612" stroke-width="1.2" opacity="0.5" fill="none">
+          <line x1="960" y1="577" x2="930" y2="618"/>
+          <line x1="960" y1="577" x2="946" y2="618"/>
+          <line x1="960" y1="577" x2="975" y2="618"/>
+          <line x1="960" y1="577" x2="1010" y2="618"/>
+          <line x1="960" y1="577" x2="1060" y2="618"/>
+          <line x1="960" y1="577" x2="1105" y2="618"/>
+          <line x1="1130" y1="577" x2="1085" y2="618"/>
+          <line x1="1130" y1="577" x2="1110" y2="618"/>
+          <line x1="1130" y1="577" x2="1140" y2="618"/>
+          <line x1="1130" y1="577" x2="1160" y2="618"/>
+        </g>
+      </g>
+      <!-- Allegheny River surface -->
+      <rect x="0" y="630" width="1600" height="370" fill="url(#waterRefl)"/>
+      <g stroke="#5B8CB8" stroke-width="1" fill="none" opacity="0.3">
+        <path d="M 0 660 Q 200 648 450 660 T 900 655 T 1600 662"/>
+        <path d="M 0 685 Q 250 672 550 685 T 1100 679 T 1600 686"/>
+        <path d="M 0 710 Q 300 696 650 710 T 1300 705"/>
+        <path d="M 0 740 Q 400 727 800 740 T 1600 736"/>
+        <path d="M 0 775 Q 500 762 1000 775 T 1600 770"/>
+      </g>
+      <!-- Golden bridge reflections in water -->
+      <g stroke="#FFB612" stroke-width="1" opacity="0.2" fill="none">
+        <line x1="190" y1="830" x2="190" y2="900"/>
+        <line x1="350" y1="835" x2="350" y2="890"/>
+        <line x1="561" y1="810" x2="561" y2="890"/>
+        <line x1="741" y1="815" x2="741" y2="895"/>
+        <line x1="960" y1="820" x2="960" y2="895"/>
+        <line x1="1130" y1="825" x2="1130" y2="900"/>
+      </g>
+      <!-- PNC Park / Heinz Field silhouette on bank -->
+      <g fill="#0d1520" opacity="0.75">
+        <!-- Heinz Field curves -->
+        <path d="M 1300 630 Q 1380 590 1460 620 L 1460 750 L 1280 750 Z"/>
+        <!-- PNC Park lower L bank -->
+        <rect x="50" y="610" width="110" height="140"/>
+        <path d="M 50 610 Q 80 590 120 600 Q 140 595 160 610"/>
+      </g>
+      <!-- Elevation profile ghost faint in background -->
+      <polyline points="0,900 120,880 280,860 480,845 680,835 820,820 960,680 1040,630 1100,680 1200,710 1400,740 1600,760" fill="none" stroke="#FFB612" stroke-width="1.5" opacity="0.12"/>
+    </svg>`,
+
+  // ZONES — Forbes Ave climb: running up through Oakland, crowd on sidewalk, CMU campus
+  zones: () => `
+    <svg viewBox="0 0 1600 1000" preserveAspectRatio="xMidYMid slice">
+      <defs>
+        <linearGradient id="oaklandSky" x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0%" stop-color="#1a1428"/>
+          <stop offset="50%" stop-color="#241c38"/>
+          <stop offset="100%" stop-color="#0a0e13"/>
+        </linearGradient>
+        <linearGradient id="roadGrad" x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0%" stop-color="#141820"/>
+          <stop offset="100%" stop-color="#1e2430"/>
+        </linearGradient>
+      </defs>
+      <rect width="1600" height="1000" fill="url(#oaklandSky)"/>
+      <!-- Road tilting uphill — Forbes Ave one-point perspective with grade -->
+      <polygon points="400,1000 640,480 960,480 1200,1000" fill="url(#roadGrad)" opacity="0.9"/>
+      <!-- Road center line dashed -->
+      <g stroke="#FFB612" stroke-width="2" opacity="0.3" stroke-dasharray="24,18">
+        <line x1="800" y1="480" x2="800" y2="1000"/>
+      </g>
+      <!-- Curbs -->
+      <line x1="400" y1="1000" x2="640" y2="480" stroke="#2a3040" stroke-width="4"/>
+      <line x1="1200" y1="1000" x2="960" y2="480" stroke="#2a3040" stroke-width="4"/>
+      <!-- Sidewalk -->
+      <polygon points="0,1000 400,1000 640,480 500,480" fill="#111820" opacity="0.8"/>
+      <polygon points="1200,1000 1600,1000 1600,480 960,480" fill="#111820" opacity="0.8"/>
+      <!-- CMU / Pitt campus buildings (left side) -->
+      <g fill="#0d1320" opacity="0.85">
+        <rect x="0" y="340" width="120" height="300"/>
+        <rect x="130" y="280" width="90" height="360"/>
+        <!-- Romanesque arches Pitt -->
+        <rect x="230" y="220" width="80" height="420" rx="2"/>
+        <rect x="256" y="200" width="28" height="40" rx="14"/>
+        <rect x="320" y="300" width="70" height="340"/>
+        <rect x="400" y="360" width="55" height="280"/>
+      </g>
+      <!-- Right side campus -->
+      <g fill="#0d1320" opacity="0.85">
+        <rect x="1150" y="350" width="110" height="290"/>
+        <rect x="1270" y="300" width="90" height="340"/>
+        <rect x="1370" y="260" width="80" height="380" rx="2"/>
+        <rect x="1396" y="240" width="28" height="40" rx="14"/>
+        <rect x="1460" y="320" width="70" height="320"/>
+        <rect x="1540" y="380" width="60" height="260"/>
+      </g>
+      <!-- Crowd spectators on sidewalk (left) -->
+      <g fill="#0d1320" opacity="0.7">
+        <ellipse cx="50" cy="700" rx="10" ry="11"/><rect x="45" y="711" width="10" height="22"/>
+        <ellipse cx="80" cy="695" rx="9" ry="10"/><rect x="75" y="705" width="9" height="24"/>
+        <ellipse cx="112" cy="698" rx="10" ry="11"/><rect x="107" y="709" width="10" height="22"/>
+        <ellipse cx="145" cy="692" rx="9" ry="10"/><rect x="140" y="702" width="9" height="25"/>
+        <ellipse cx="175" cy="700" rx="10" ry="11"/><rect x="170" y="711" width="10" height="22"/>
+        <ellipse cx="208" cy="694" rx="9" ry="10"/><rect x="203" y="704" width="9" height="23"/>
+        <ellipse cx="240" cy="690" rx="10" ry="11"/><rect x="235" y="701" width="10" height="24"/>
+        <ellipse cx="274" cy="696" rx="9" ry="10"/><rect x="269" y="706" width="9" height="22"/>
+        <ellipse cx="308" cy="692" rx="9" ry="10"/><rect x="303" y="702" width="9" height="24"/>
+        <ellipse cx="342" cy="700" rx="10" ry="11"/><rect x="337" y="711" width="10" height="22"/>
+      </g>
+      <!-- Crowd spectators on sidewalk (right) -->
+      <g fill="#0d1320" opacity="0.7">
+        <ellipse cx="1260" cy="696" rx="10" ry="11"/><rect x="1255" y="707" width="10" height="22"/>
+        <ellipse cx="1295" cy="692" rx="9" ry="10"/><rect x="1290" y="702" width="9" height="24"/>
+        <ellipse cx="1330" cy="698" rx="10" ry="11"/><rect x="1325" y="709" width="10" height="22"/>
+        <ellipse cx="1364" cy="694" rx="9" ry="10"/><rect x="1359" y="704" width="9" height="23"/>
+        <ellipse cx="1398" cy="700" rx="10" ry="11"/><rect x="1393" y="711" width="10" height="22"/>
+        <ellipse cx="1432" cy="692" rx="9" ry="10"/><rect x="1427" y="702" width="9" height="25"/>
+        <ellipse cx="1466" cy="698" rx="10" ry="11"/><rect x="1461" y="709" width="10" height="22"/>
+        <ellipse cx="1500" cy="694" rx="9" ry="10"/><rect x="1495" y="704" width="9" height="23"/>
+        <ellipse cx="1534" cy="700" rx="10" ry="11"/><rect x="1529" y="711" width="10" height="22"/>
+        <ellipse cx="1568" cy="696" rx="9" ry="10"/><rect x="1563" y="706" width="9" height="22"/>
+      </g>
+      <!-- Runners mid-climb — three figures in the road -->
+      <g fill="#1a2535" opacity="0.75">
+        <!-- Lead runner -->
+        <ellipse cx="720" cy="680" rx="11" ry="12"/>
+        <path d="M 720 692 L 712 720 L 704 750 M 720 692 L 728 720 L 738 748 M 720 705 L 700 716 M 720 705 L 742 712" stroke="#2a3545" stroke-width="3" fill="none"/>
+        <!-- Second runner -->
+        <ellipse cx="780" cy="700" rx="10" ry="11"/>
+        <path d="M 780 711 L 773 738 L 766 765 M 780 711 L 787 738 L 796 763 M 780 724 L 762 734 M 780 724 L 800 730" stroke="#2a3545" stroke-width="3" fill="none"/>
+        <!-- Third runner -->
+        <ellipse cx="850" cy="720" rx="10" ry="11"/>
+        <path d="M 850 731 L 843 758 L 836 785 M 850 731 L 857 758 L 866 783 M 850 744 L 832 754 M 850 744 L 870 750" stroke="#2a3545" stroke-width="3" fill="none"/>
+      </g>
+      <!-- Grade marker sign -->
+      <rect x="960" y="530" width="68" height="32" rx="3" fill="#0a0e13" stroke="#FFB612" stroke-width="1.5" opacity="0.8"/>
+      <text x="994" y="551" fill="#FFB612" font-family="ui-monospace,monospace" font-size="12" text-anchor="middle" letter-spacing="0.1em">+8% ↑</text>
+      <!-- Street lamp glow -->
+      <circle cx="380" cy="490" r="18" fill="#FFB612" opacity="0.12"/>
+      <circle cx="1220" cy="490" r="18" fill="#FFB612" opacity="0.12"/>
+      <circle cx="380" cy="492" r="6" fill="#FFB612" opacity="0.6"/>
+      <line x1="380" y1="498" x2="380" y2="700" stroke="#2a3040" stroke-width="4" opacity="0.8"/>
+      <circle cx="1220" cy="492" r="6" fill="#FFB612" opacity="0.5"/>
+      <line x1="1220" y1="498" x2="1220" y2="700" stroke="#2a3040" stroke-width="4" opacity="0.8"/>
+    </svg>`,
+
+  // FUEL — Schenley Park descent after the climb: trees, runners, aid station
+  fuel: () => `
+    <svg viewBox="0 0 1600 1000" preserveAspectRatio="xMidYMid slice">
+      <defs>
+        <linearGradient id="parkSky" x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0%" stop-color="#0e1c10"/>
+          <stop offset="45%" stop-color="#142018"/>
+          <stop offset="100%" stop-color="#0a0e13"/>
+        </linearGradient>
+        <radialGradient id="aidGlow" cx="0.5" cy="0.58" r="0.35">
+          <stop offset="0%" stop-color="#5B8CB8" stop-opacity="0.3"/>
+          <stop offset="100%" stop-color="#0a0e13" stop-opacity="0"/>
+        </radialGradient>
+      </defs>
+      <rect width="1600" height="1000" fill="url(#parkSky)"/>
+      <rect width="1600" height="1000" fill="url(#aidGlow)"/>
+      <!-- Road curving downhill through park -->
+      <path d="M 0 900 Q 400 820 800 780 Q 1200 740 1600 700" fill="none" stroke="#1e2830" stroke-width="100" opacity="0.9"/>
+      <path d="M 0 900 Q 400 820 800 780 Q 1200 740 1600 700" fill="none" stroke="#FFB612" stroke-width="1.5" stroke-dasharray="20,14" opacity="0.22"/>
+      <!-- Tree line left — Schenley Park -->
+      <g fill="#0c1a0e" opacity="0.9">
+        <ellipse cx="60" cy="480" rx="55" ry="70"/><rect x="52" y="540" width="16" height="180"/>
+        <ellipse cx="160" cy="440" rx="62" ry="80"/><rect x="152" y="508" width="16" height="200"/>
+        <ellipse cx="265" cy="460" rx="58" ry="72"/><rect x="257" y="524" width="16" height="190"/>
+        <ellipse cx="365" cy="430" rx="65" ry="85"/><rect x="357" y="505" width="16" height="210"/>
+        <ellipse cx="468" cy="450" rx="56" ry="70"/><rect x="460" y="512" width="16" height="190"/>
+        <ellipse cx="565" cy="420" rx="60" ry="78"/><rect x="557" y="490" width="16" height="200"/>
+        <ellipse cx="665" cy="445" rx="54" ry="68"/><rect x="657" y="505" width="16" height="180"/>
+      </g>
+      <!-- Tree line right -->
+      <g fill="#0c1a0e" opacity="0.9">
+        <ellipse cx="940" cy="445" rx="58" ry="74"/><rect x="932" y="511" width="16" height="185"/>
+        <ellipse cx="1038" cy="420" rx="62" ry="80"/><rect x="1030" y="492" width="16" height="200"/>
+        <ellipse cx="1140" cy="440" rx="56" ry="70"/><rect x="1132" y="502" width="16" height="190"/>
+        <ellipse cx="1238" cy="415" rx="64" ry="84"/><rect x="1230" y="491" width="16" height="210"/>
+        <ellipse cx="1340" cy="435" rx="58" ry="72"/><rect x="1332" y="499" width="16" height="195"/>
+        <ellipse cx="1438" cy="420" rx="60" ry="78"/><rect x="1430" y="490" width="16" height="205"/>
+        <ellipse cx="1538" cy="445" rx="52" ry="66"/><rect x="1530" y="503" width="16" height="182"/>
+      </g>
+      <!-- Aid station — table with cups -->
+      <rect x="720" y="748" width="160" height="18" fill="#2a3848" opacity="0.9"/>
+      <rect x="728" y="730" width="8" height="18" fill="#2a3848" opacity="0.9"/>
+      <rect x="864" y="730" width="8" height="18" fill="#2a3848" opacity="0.9"/>
+      <!-- Cups on table -->
+      <g fill="#5B8CB8" opacity="0.75">
+        <polygon points="740,748 746,732 752,748"/>
+        <polygon points="758,748 764,732 770,748"/>
+        <polygon points="776,748 782,732 788,748"/>
+        <polygon points="794,748 800,732 806,748"/>
+        <polygon points="812,748 818,732 824,748"/>
+        <polygon points="830,748 836,732 842,748"/>
+        <polygon points="848,748 854,732 860,748"/>
+      </g>
+      <!-- Volunteer silhouette behind table -->
+      <ellipse cx="800" cy="714" rx="12" ry="13" fill="#1a2838" opacity="0.8"/>
+      <rect x="790" y="727" width="20" height="30" fill="#1a2838" opacity="0.8"/>
+      <!-- Runner taking a cup -->
+      <ellipse cx="870" cy="740" rx="10" ry="11" fill="#1a2838" opacity="0.75"/>
+      <path d="M 870 751 L 864 775 L 858 800 M 870 751 L 876 775 L 883 798 M 870 762 L 882 752 L 892 745" stroke="#243040" stroke-width="3" fill="none" opacity="0.75"/>
+      <!-- Topo contour rings background (Schenley topo) -->
+      <g fill="none" stroke="#7FA68C" opacity="0.08">
+        <ellipse cx="800" cy="400" rx="320" ry="180"/>
+        <ellipse cx="800" cy="400" rx="380" ry="220"/>
+        <ellipse cx="800" cy="400" rx="450" ry="265"/>
+        <ellipse cx="800" cy="400" rx="530" ry="315"/>
+      </g>
+      <!-- Mile marker sign in trees -->
+      <rect x="680" y="600" width="44" height="60" rx="2" fill="#FFB612" opacity="0.8"/>
+      <text x="702" y="624" fill="#0a0e13" font-family="ui-monospace,monospace" font-size="11" text-anchor="middle" font-weight="700">MI</text>
+      <text x="702" y="643" fill="#0a0e13" font-family="ui-monospace,monospace" font-size="16" text-anchor="middle" font-weight="700">14</text>
+      <rect x="700" y="660" width="4" height="110" fill="#FFB612" opacity="0.8"/>
+    </svg>`,
+
+  // WRISTBAND — The Crucible heat: Forbes mid-climb, heat distortion, lone runner
+  wristband: () => `
+    <svg viewBox="0 0 1600 1000" preserveAspectRatio="xMidYMid slice">
+      <defs>
+        <radialGradient id="crucibleCore" cx="0.5" cy="0.45" r="0.65">
+          <stop offset="0%" stop-color="#D9501F" stop-opacity="0.5"/>
+          <stop offset="35%" stop-color="#B8401C" stop-opacity="0.28"/>
+          <stop offset="65%" stop-color="#7a1c08" stop-opacity="0.12"/>
+          <stop offset="100%" stop-color="#0a0e13" stop-opacity="0"/>
+        </radialGradient>
+        <linearGradient id="crucibleGround" x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0%" stop-color="#200e08"/>
+          <stop offset="100%" stop-color="#0a0e13"/>
+        </linearGradient>
+        <filter id="heatShimmer">
+          <feTurbulence type="turbulence" baseFrequency="0.02 0.05" numOctaves="2" seed="4" result="noise"/>
+          <feDisplacementMap in="SourceGraphic" in2="noise" scale="6" xChannelSelector="R" yChannelSelector="G"/>
+        </filter>
+      </defs>
+      <rect width="1600" height="1000" fill="url(#crucibleGround)"/>
+      <rect width="1600" height="1000" fill="url(#crucibleCore)"/>
+      <!-- Road surging uphill — steeper angle than zones scene -->
+      <polygon points="550,1000 720,450 880,450 1050,1000" fill="#160c08" opacity="0.9"/>
+      <line x1="800" y1="450" x2="800" y2="1000" stroke="#D9501F" stroke-width="1.5" stroke-dasharray="16,12" opacity="0.2"/>
+      <!-- Heat shimmer lines rising from road -->
+      <g filter="url(#heatShimmer)" opacity="0.35">
+        <line x1="600" y1="900" x2="620" y2="450" stroke="#FF7E45" stroke-width="1"/>
+        <line x1="700" y1="920" x2="710" y2="455" stroke="#FF7E45" stroke-width="0.8"/>
+        <line x1="800" y1="900" x2="800" y2="450" stroke="#FF7E45" stroke-width="1"/>
+        <line x1="900" y1="920" x2="892" y2="455" stroke="#FF7E45" stroke-width="0.8"/>
+        <line x1="1000" y1="900" x2="980" y2="450" stroke="#FF7E45" stroke-width="1"/>
+      </g>
+      <!-- Lone runner pushing up the climb — determined posture, leaning forward -->
+      <g opacity="0.82" fill="#3a1808">
+        <ellipse cx="800" cy="610" rx="14" ry="15"/>
+        <!-- torso leaning forward hard -->
+        <path d="M 800 625 L 788 660 L 778 700 M 800 625 L 812 660 L 824 695 M 800 638 L 778 648 L 760 638 M 800 638 L 822 645 L 836 638" stroke="#5a2810" stroke-width="4" fill="none"/>
+      </g>
+      <!-- Crowd on sides — blurred/darkened in the heat -->
+      <g fill="#1a0e08" opacity="0.55">
+        <ellipse cx="200" cy="800" rx="11" ry="12"/><rect x="195" y="812" width="11" height="26"/>
+        <ellipse cx="235" cy="796" rx="10" ry="11"/><rect x="230" y="807" width="10" height="28"/>
+        <ellipse cx="268" cy="800" rx="11" ry="12"/><rect x="263" y="812" width="11" height="26"/>
+        <ellipse cx="302" cy="794" rx="10" ry="11"/><rect x="297" y="805" width="10" height="28"/>
+        <ellipse cx="338" cy="800" rx="11" ry="12"/><rect x="333" y="812" width="11" height="26"/>
+        <ellipse cx="374" cy="796" rx="10" ry="11"/><rect x="369" y="807" width="10" height="27"/>
+        <ellipse cx="410" cy="800" rx="11" ry="12"/><rect x="405" y="812" width="11" height="26"/>
+        <ellipse cx="446" cy="794" rx="10" ry="11"/><rect x="441" y="805" width="10" height="28"/>
+        <ellipse cx="482" cy="800" rx="11" ry="12"/><rect x="477" y="812" width="11" height="26"/>
+        <ellipse cx="1118" cy="800" rx="11" ry="12"/><rect x="1113" y="812" width="11" height="26"/>
+        <ellipse cx="1154" cy="796" rx="10" ry="11"/><rect x="1149" y="807" width="10" height="28"/>
+        <ellipse cx="1190" cy="800" rx="11" ry="12"/><rect x="1185" y="812" width="11" height="26"/>
+        <ellipse cx="1226" cy="794" rx="10" ry="11"/><rect x="1221" y="805" width="10" height="28"/>
+        <ellipse cx="1262" cy="800" rx="11" ry="12"/><rect x="1257" y="812" width="11" height="26"/>
+        <ellipse cx="1298" cy="796" rx="10" ry="11"/><rect x="1293" y="807" width="10" height="27"/>
+        <ellipse cx="1334" cy="800" rx="11" ry="12"/><rect x="1329" y="812" width="11" height="26"/>
+        <ellipse cx="1370" cy="794" rx="10" ry="11"/><rect x="1365" y="805" width="10" height="28"/>
+      </g>
+      <!-- CMU/Pitt signage visible top of the hill -->
+      <rect x="750" y="458" width="100" height="22" rx="2" fill="#D9501F" opacity="0.7"/>
+      <text x="800" y="474" fill="#E8DFC9" font-family="ui-monospace,monospace" font-size="10" text-anchor="middle" letter-spacing="0.15em">SCHENLEY PL</text>
+      <!-- Warning label burned in: THE CRUCIBLE -->
+      <text x="800" y="380" fill="#FF7E45" font-family="ui-monospace,monospace" font-size="22" text-anchor="middle" letter-spacing="0.3em" opacity="0.5">⚠ THE CRUCIBLE · MI 11–13</text>
+    </svg>`,
+
+  // IFTHEN — Highland Park descent: a long open stretch, runner mid-stride, mile markers
+  ifthen: () => `
+    <svg viewBox="0 0 1600 1000" preserveAspectRatio="xMidYMid slice">
+      <defs>
+        <linearGradient id="descentSky" x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0%" stop-color="#101c28"/>
+          <stop offset="50%" stop-color="#1a2a3c"/>
+          <stop offset="100%" stop-color="#0a0e13"/>
+        </linearGradient>
+        <linearGradient id="roadDown" x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0%" stop-color="#181e28"/>
+          <stop offset="100%" stop-color="#1e2838"/>
+        </linearGradient>
+      </defs>
+      <rect width="1600" height="1000" fill="url(#descentSky)"/>
+      <!-- Road going downhill toward the Strip — wide perspective -->
+      <polygon points="100,1000 560,600 1040,600 1500,1000" fill="url(#roadDown)" opacity="0.95"/>
+      <!-- Road edge lines -->
+      <line x1="100" y1="1000" x2="560" y2="600" stroke="#2a3848" stroke-width="5"/>
+      <line x1="1500" y1="1000" x2="1040" y2="600" stroke="#2a3848" stroke-width="5"/>
+      <!-- Dashed center line -->
+      <line x1="800" y1="600" x2="800" y2="1000" stroke="#B8401C" stroke-width="2" stroke-dasharray="22,16" opacity="0.3"/>
+      <!-- Mile markers receding into distance -->
+      <g fill="#FFB612" opacity="0.7">
+        <rect x="92" y="830" width="4" height="80"/>
+        <rect x="88" y="820" width="12" height="14" rx="1"/>
+        <text x="94" y="831" fill="#0a0e13" font-family="ui-monospace,monospace" font-size="7" text-anchor="middle" font-weight="700">22</text>
+      </g>
+      <g fill="#FFB612" opacity="0.55">
+        <rect x="350" y="740" width="3" height="60"/>
+        <rect x="347" y="732" width="10" height="11" rx="1"/>
+        <text x="352" y="741" fill="#0a0e13" font-family="ui-monospace,monospace" font-size="6" text-anchor="middle" font-weight="700">23</text>
+      </g>
+      <g fill="#FFB612" opacity="0.4">
+        <rect x="564" y="640" width="2" height="44"/>
+        <rect x="562" y="634" width="8" height="9" rx="1"/>
+        <text x="566" y="641" fill="#0a0e13" font-family="ui-monospace,monospace" font-size="5" text-anchor="middle" font-weight="700">24</text>
+      </g>
+      <!-- Skyline appearing in the distance (downtown below the descent) -->
+      <g fill="#0d1520" opacity="0.65">
+        <rect x="600" y="562" width="22" height="60"/>
+        <rect x="630" y="545" width="18" height="77"/>
+        <rect x="656" y="558" width="26" height="64"/>
+        <polygon points="690,570 700,540 710,570"/>
+        <rect x="716" y="555" width="20" height="67"/>
+        <rect x="742" y="542" width="24" height="80"/>
+        <rect x="772" y="560" width="20" height="62"/>
+        <rect x="798" y="548" width="18" height="74"/>
+        <rect x="822" y="558" width="22" height="64"/>
+        <rect x="850" y="545" width="20" height="77"/>
+        <rect x="876" y="560" width="18" height="62"/>
+        <rect x="900" y="548" width="24" height="74"/>
+        <rect x="930" y="558" width="20" height="64"/>
+        <rect x="956" y="542" width="22" height="80"/>
+        <rect x="984" y="560" width="18" height="62"/>
+      </g>
+      <!-- Runner mid-stride, looking strong — mile 22 -->
+      <g opacity="0.78" fill="#1a2c40">
+        <ellipse cx="300" cy="870" rx="13" ry="14"/>
+        <path d="M 300 884 L 291 915 L 282 950 M 300 884 L 309 915 L 320 948 M 300 897 L 278 907 L 258 895 M 300 897 L 322 904 L 336 893" stroke="#253545" stroke-width="4" fill="none"/>
+      </g>
+      <!-- Ambulance of runners in the distance — 5 small figures -->
+      <g fill="#1a2838" opacity="0.5">
+        <ellipse cx="560" cy="660" rx="7" ry="8"/><rect x="557" y="668" width="7" height="16"/>
+        <ellipse cx="582" cy="658" rx="6" ry="7"/><rect x="579" y="665" width="6" height="16"/>
+        <ellipse cx="602" cy="661" rx="6" ry="7"/><rect x="599" y="668" width="6" height="15"/>
+        <ellipse cx="622" cy="657" rx="6" ry="7"/><rect x="619" y="664" width="6" height="16"/>
+        <ellipse cx="642" cy="660" rx="7" ry="8"/><rect x="639" y="668" width="7" height="15"/>
+      </g>
+      <!-- Strip District warehouses on sides -->
+      <g fill="#0d1520" opacity="0.8">
+        <rect x="0" y="650" width="160" height="350"/>
+        <rect x="1440" y="650" width="160" height="350"/>
+        <rect x="0" y="550" width="100" height="450"/>
+        <rect x="1500" y="550" width="100" height="450"/>
+      </g>
+      <!-- Sparse trees on median -->
+      <g fill="#0c1a10" opacity="0.65">
+        <ellipse cx="770" cy="610" rx="22" ry="28"/><rect x="767" y="636" width="6" height="40"/>
+        <ellipse cx="840" cy="608" rx="20" ry="26"/><rect x="837" y="632" width="6" height="38"/>
+      </g>
+    </svg>`,
+
+  // COACH — Point State Park finish line: fountain, finish tape, final sprint at dawn
+  coach: () => `
+    <svg viewBox="0 0 1600 1000" preserveAspectRatio="xMidYMid slice">
+      <defs>
+        <radialGradient id="finishBlaze" cx="0.5" cy="0.42" r="0.62">
+          <stop offset="0%" stop-color="#FFB612" stop-opacity="0.55"/>
+          <stop offset="28%" stop-color="#FF8C00" stop-opacity="0.28"/>
+          <stop offset="60%" stop-color="#8B6308" stop-opacity="0.12"/>
+          <stop offset="100%" stop-color="#0a0e13" stop-opacity="0"/>
+        </radialGradient>
+        <linearGradient id="finishSky" x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0%" stop-color="#1a1808"/>
+          <stop offset="45%" stop-color="#241e0c"/>
+          <stop offset="100%" stop-color="#0a0e13"/>
+        </linearGradient>
+        <filter id="finishGlowF">
+          <feGaussianBlur stdDeviation="4" result="b"/>
+          <feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge>
+        </filter>
+      </defs>
+      <rect width="1600" height="1000" fill="url(#finishSky)"/>
+      <rect width="1600" height="1000" fill="url(#finishBlaze)"/>
+      <!-- Road leading to finish — flat, wide, final 200m -->
+      <polygon points="0,1000 450,680 1150,680 1600,1000" fill="#1e1a08" opacity="0.85"/>
+      <!-- Finish line tape across the road -->
+      <line x1="0" y1="780" x2="1600" y2="780" stroke="#FFB612" stroke-width="5" opacity="0.85" filter="url(#finishGlowF)"/>
+      <line x1="0" y1="787" x2="1600" y2="787" stroke="#E8DFC9" stroke-width="2.5" opacity="0.5"/>
+      <!-- Point State Park fountain — iconic splash arcs -->
+      <g filter="url(#finishGlowF)" opacity="0.75">
+        <!-- main fountain jet -->
+        <path d="M 800 640 Q 800 480 800 380" stroke="#5B8CB8" stroke-width="6" fill="none" opacity="0.7"/>
+        <!-- mist crown at top -->
+        <ellipse cx="800" cy="380" rx="30" ry="16" fill="#5B8CB8" opacity="0.4"/>
+        <!-- spray arcs cascading outward -->
+        <path d="M 800 640 Q 740 520 680 580" stroke="#5B8CB8" stroke-width="3" fill="none" opacity="0.5"/>
+        <path d="M 800 640 Q 860 520 920 580" stroke="#5B8CB8" stroke-width="3" fill="none" opacity="0.5"/>
+        <path d="M 800 640 Q 700 500 620 540" stroke="#5B8CB8" stroke-width="2" fill="none" opacity="0.35"/>
+        <path d="M 800 640 Q 900 500 980 540" stroke="#5B8CB8" stroke-width="2" fill="none" opacity="0.35"/>
+        <path d="M 800 640 Q 660 490 560 510" stroke="#5B8CB8" stroke-width="1.5" fill="none" opacity="0.25"/>
+        <path d="M 800 640 Q 940 490 1040 510" stroke="#5B8CB8" stroke-width="1.5" fill="none" opacity="0.25"/>
+        <!-- fountain pool base -->
+        <ellipse cx="800" cy="650" rx="100" ry="28" fill="#3a6080" opacity="0.4"/>
+        <ellipse cx="800" cy="650" rx="70" ry="20" fill="#5B8CB8" opacity="0.3"/>
+      </g>
+      <!-- Finish arch / scaffolding -->
+      <rect x="440" y="540" width="20" height="260" fill="#1a1808" opacity="0.9"/>
+      <rect x="1140" y="540" width="20" height="260" fill="#1a1808" opacity="0.9"/>
+      <rect x="440" y="540" width="720" height="18" fill="#1a1808" opacity="0.9"/>
+      <!-- FINISH banner text on arch -->
+      <rect x="440" y="540" width="720" height="40" fill="#FFB612" opacity="0.85"/>
+      <text x="800" y="567" fill="#0a0e13" font-family="ui-monospace,monospace" font-size="22" text-anchor="middle" letter-spacing="0.45em" font-weight="700">PITTSBURGH MARATHON — FINISH</text>
+      <!-- Crowd lining the finish chute — both sides, tight crowd -->
+      <g fill="#1a1408" opacity="0.75">
+        <!-- Left crowd: 20 figures -->
+        <ellipse cx="35" cy="810" rx="11" ry="12"/><rect x="30" y="822" width="10" height="24"/>
+        <ellipse cx="68" cy="806" rx="10" ry="11"/><rect x="63" y="817" width="10" height="25"/>
+        <ellipse cx="100" cy="810" rx="11" ry="12"/><rect x="95" y="822" width="10" height="24"/>
+        <ellipse cx="133" cy="806" rx="10" ry="11"/><rect x="128" y="817" width="10" height="25"/>
+        <ellipse cx="166" cy="810" rx="11" ry="12"/><rect x="161" y="822" width="10" height="24"/>
+        <ellipse cx="199" cy="806" rx="10" ry="11"/><rect x="194" y="817" width="10" height="25"/>
+        <ellipse cx="232" cy="810" rx="11" ry="12"/><rect x="227" y="822" width="10" height="24"/>
+        <ellipse cx="265" cy="806" rx="10" ry="11"/><rect x="260" y="817" width="10" height="25"/>
+        <ellipse cx="298" cy="810" rx="11" ry="12"/><rect x="293" y="822" width="10" height="24"/>
+        <ellipse cx="331" cy="806" rx="10" ry="11"/><rect x="326" y="817" width="10" height="25"/>
+        <ellipse cx="364" cy="810" rx="11" ry="12"/><rect x="359" y="822" width="10" height="24"/>
+        <ellipse cx="397" cy="806" rx="10" ry="11"/><rect x="392" y="817" width="10" height="25"/>
+        <ellipse cx="430" cy="810" rx="11" ry="12"/><rect x="425" y="822" width="10" height="24"/>
+        <!-- Right crowd: 20 figures -->
+        <ellipse cx="1170" cy="810" rx="11" ry="12"/><rect x="1165" y="822" width="10" height="24"/>
+        <ellipse cx="1203" cy="806" rx="10" ry="11"/><rect x="1198" y="817" width="10" height="25"/>
+        <ellipse cx="1236" cy="810" rx="11" ry="12"/><rect x="1231" y="822" width="10" height="24"/>
+        <ellipse cx="1269" cy="806" rx="10" ry="11"/><rect x="1264" y="817" width="10" height="25"/>
+        <ellipse cx="1302" cy="810" rx="11" ry="12"/><rect x="1297" y="822" width="10" height="24"/>
+        <ellipse cx="1335" cy="806" rx="10" ry="11"/><rect x="1330" y="817" width="10" height="25"/>
+        <ellipse cx="1368" cy="810" rx="11" ry="12"/><rect x="1363" y="822" width="10" height="24"/>
+        <ellipse cx="1401" cy="806" rx="10" ry="11"/><rect x="1396" y="817" width="10" height="25"/>
+        <ellipse cx="1434" cy="810" rx="11" ry="12"/><rect x="1429" y="822" width="10" height="24"/>
+        <ellipse cx="1467" cy="806" rx="10" ry="11"/><rect x="1462" y="817" width="10" height="25"/>
+        <ellipse cx="1500" cy="810" rx="11" ry="12"/><rect x="1495" y="822" width="10" height="24"/>
+        <ellipse cx="1533" cy="806" rx="10" ry="11"/><rect x="1528" y="817" width="10" height="25"/>
+        <ellipse cx="1566" cy="810" rx="11" ry="12"/><rect x="1561" y="822" width="10" height="24"/>
+      </g>
+      <!-- Runner in final sprint — arms up, crossing the line -->
+      <g opacity="0.85" fill="#2a1e08" filter="url(#finishGlowF)">
+        <ellipse cx="800" cy="800" rx="14" ry="15"/>
+        <!-- arms raised in victory -->
+        <path d="M 800 815 L 795 848 L 792 882 M 800 815 L 805 848 L 808 882 M 800 828 L 770 806 L 756 790 M 800 828 L 830 806 L 844 790" stroke="#3a2810" stroke-width="4.5" fill="none"/>
+      </g>
+      <!-- Confetti dots at the tape -->
+      <g opacity="0.6">
+        <circle cx="500" cy="750" r="4" fill="#FFB612"/><circle cx="540" cy="760" r="3" fill="#E8DFC9"/>
+        <circle cx="580" cy="745" r="4" fill="#FFB612"/><circle cx="620" cy="755" r="3" fill="#5B8CB8"/>
+        <circle cx="660" cy="742" r="4" fill="#FFB612"/><circle cx="700" cy="758" r="3" fill="#E8DFC9"/>
+        <circle cx="740" cy="746" r="3" fill="#7FA68C"/><circle cx="770" cy="754" r="4" fill="#FFB612"/>
+        <circle cx="830" cy="746" r="4" fill="#FFB612"/><circle cx="860" cy="758" r="3" fill="#E8DFC9"/>
+        <circle cx="900" cy="742" r="4" fill="#D9501F"/><circle cx="940" cy="756" r="3" fill="#FFB612"/>
+        <circle cx="980" cy="748" r="4" fill="#FFB612"/><circle cx="1020" cy="760" r="3" fill="#5B8CB8"/>
+        <circle cx="1060" cy="745" r="3" fill="#E8DFC9"/><circle cx="1100" cy="754" r="4" fill="#FFB612"/>
+      </g>
+      <!-- Pittsburgh bridges in the dawn background -->
+      <g fill="#0d1520" opacity="0.4">
+        <path d="M 0 620 Q 160 580 320 620"/>
+        <path d="M 1280 620 Q 1440 580 1600 620"/>
+      </g>
+      <!-- 3:35:00 clock on finish gantry -->
+      <rect x="660" y="555" width="130" height="38" fill="#0a0e13" opacity="0.85" rx="2"/>
+      <text x="725" y="580" fill="#FFB612" font-family="ui-monospace,monospace" font-size="20" text-anchor="middle" font-weight="700" letter-spacing="0.08em">3:35:22</text>
+    </svg>`
+};
+
+function buildScenes() {
+  const stack = document.getElementById('scene-stack');
+  stack.innerHTML = Object.entries(SCENES).map(([id, fn]) =>
+    `<div class="scene" data-scene="${id}">${fn()}</div>`
+  ).join('');
+}
+
+function setActiveScene(id) {
+  document.querySelectorAll('.scene').forEach(s => {
+    s.classList.toggle('active', s.dataset.scene === id);
+  });
+}
+
+/* =============================================================
+   MILE-COUNTER RAIL \u2014 maps page scroll to mile + cumulative time
+   ============================================================= */
+// Hand-keyed cumulative time at 3:35 plan
+const PACE_TABLE = [ // [mile, cumSec]
+  [0,0],[1,510],[2,1015],[3,1515],[4,2010],[5,2503],[6,2996],[7,3489],[8,3979],
+  [9,4472],[10,4970],[11,5480],[12,6040],[13,6550],[14,7040],[15,7535],[16,8030],
+  [17,8535],[18,9035],[19,9535],[20,10035],[21,10530],[22,11010],[23,11485],
+  [24,11965],[25,12440],[26,12910],[26.2,13002]
+];
+function cumSecAtMile(mi) {
+  for (let i = 0; i < PACE_TABLE.length - 1; i++) {
+    const [m1, s1] = PACE_TABLE[i], [m2, s2] = PACE_TABLE[i+1];
+    if (mi <= m2) {
+      const t = (mi - m1) / (m2 - m1);
+      return s1 + t * (s2 - s1);
+    }
+  }
+  return PACE_TABLE[PACE_TABLE.length-1][1];
+}
+function fmtClock(sec) {
+  const h = Math.floor(sec/3600);
+  const m = Math.floor((sec%3600)/60);
+  const s = Math.floor(sec%60);
+  return `${h}:${String(m).padStart(2,'0')}:${String(s).padStart(2,'0')}`;
+}
+
+function buildMileTicks() {
+  const ticks = document.getElementById('mileTicks');
+  let html = '';
+  for (let mi = 0; mi <= 26; mi++) {
+    const major = mi % 5 === 0;
+    const top = (mi/26.2)*100;
+    html += `<div class="tick ${major?'major':''}" style="top:${top}%">${major?`<span class="lab">M${mi}</span>`:''}</div>`;
+  }
+  ticks.innerHTML = html;
+}
+
+/* Map scroll position to a mile (0 \u2192 26.2) using section anchors. */
+const SCROLL_MILE_ANCHORS = [
+  { id: 'hero', startMi: 0, endMi: 0 },
+  { id: 'elevation', startMi: 0, endMi: 6 },
+  { id: 'zones', startMi: 6, endMi: 13 },
+  { id: 'fuel', startMi: 13, endMi: 18 },
+  { id: 'wristband', startMi: 18, endMi: 22 },
+  { id: 'ifthen', startMi: 22, endMi: 25 },
+  { id: 'coach', startMi: 25, endMi: 26.2 }
+];
+
+function currentMileFromScroll() {
+  const vh = window.innerHeight;
+  const scrollMid = window.scrollY + vh * 0.5;
+  let active = SCROLL_MILE_ANCHORS[0];
+  let progress = 0;
+  for (const a of SCROLL_MILE_ANCHORS) {
+    const el = document.getElementById(a.id);
+    if (!el) continue;
+    const top = el.offsetTop;
+    const bot = top + el.offsetHeight;
+    if (scrollMid >= top && scrollMid <= bot) {
+      active = a;
+      progress = (scrollMid - top) / (bot - top);
+      break;
+    }
+    if (scrollMid > bot) {
+      active = a;
+      progress = 1;
+    }
+  }
+  return active.startMi + (active.endMi - active.startMi) * Math.max(0, Math.min(1, progress));
+}
+
+function updateMileRail() {
+  const mi = currentMileFromScroll();
+  const pct = (mi/26.2)*100;
+  const fill = document.getElementById('mileFill');
+  const marker = document.getElementById('mileMarker');
+  if (fill) fill.style.height = pct + '%';
+  if (marker) marker.style.top = pct + '%';
+  document.getElementById('mileNum').innerHTML = `${mi.toFixed(1)}<small>/26.2</small>`;
+  document.getElementById('mileTime').textContent = fmtClock(cumSecAtMile(mi));
+  // zone label + pill color
+  let lbl, zone, zoneColor;
+  if (mi <= 0)          { lbl = 'SCROLL TO TRACK'; zone = 'PRE-RACE'; zoneColor = 'var(--text-dim)'; }
+  else if (mi < 3)      { lbl = 'Z1 · SETTLE';     zone = 'Z1';       zoneColor = 'var(--z1)'; }
+  else if (mi < 6)      { lbl = 'Z2 · CRUISE';     zone = 'Z2';       zoneColor = 'var(--z2)'; }
+  else if (mi < 10)     { lbl = 'Z3 · RIVER ROLL'; zone = 'Z3';       zoneColor = 'var(--z3)'; }
+  else if (mi < 11)     { lbl = 'Z4 · APPROACH';   zone = 'Z4';       zoneColor = 'var(--z4)'; }
+  else if (mi < 13)     { lbl = 'Z5 · CRUCIBLE ⚠'; zone = 'Z5';       zoneColor = 'var(--z5)'; }
+  else if (mi < 21)     { lbl = 'Z6 · GRIND';      zone = 'Z6';       zoneColor = 'var(--z6)'; }
+  else if (mi < 26.2)   { lbl = 'Z7 · BRING IT';   zone = 'Z7';       zoneColor = 'var(--z7)'; }
+  else                  { lbl = 'FINISH ✓';         zone = 'DONE';     zoneColor = 'var(--gold)'; }
+  const pillEl = document.getElementById('mileZone');
+  const lblEl  = document.getElementById('mileLbl');
+  if (pillEl) {
+    pillEl.textContent = zone;
+    pillEl.style.background = zoneColor;
+    pillEl.style.color = (mi >= 21 || mi <= 0) ? 'var(--ink)' : '#fff';
+  }
+  if (lblEl) lblEl.textContent = lbl;
+
+  // mini-map you-are-here
+  updateMiniMap(mi);
+}
+
+/* =============================================================
+   MINI ELEVATION MAP \u2014 you-are-here marker
+   ============================================================= */
+function buildMiniMap() {
+  const svg = document.getElementById('miniMapSvg');
+  const W = 280, H = 70;
+  const samples = ELEV;
+  const minE = Math.min(...samples), maxE = Math.max(...samples), range = maxE - minE;
+  const x = i => (i/(samples.length-1))*W;
+  const y = e => H - 8 - ((e - minE)/range) * (H - 18);
+  const pts = samples.map((e,i)=>`${x(i).toFixed(1)},${y(e).toFixed(1)}`);
+  const fillPath = `M ${pts.join(' L ')} L ${W},${H-4} L 0,${H-4} Z`;
+  const strokePath = `M ${pts.join(' L ')}`;
+  svg.innerHTML = `
+    <defs>
+      <linearGradient id="miniFill" x1="0" y1="0" x2="1" y2="0">
+        <stop offset="0" stop-color="#4A6FA5"/>
+        <stop offset="0.42" stop-color="#7FA68C"/>
+        <stop offset="0.5" stop-color="#D9501F"/>
+        <stop offset="0.8" stop-color="#B8401C"/>
+        <stop offset="1" stop-color="#FFB612"/>
+      </linearGradient>
+    </defs>
+    <path d="${fillPath}" fill="url(#miniFill)" opacity="0.18"/>
+    <path d="${strokePath}" fill="none" stroke="url(#miniFill)" stroke-width="1.5"/>
+    <line id="miniCross" x1="0" x2="0" y1="2" y2="${H-2}" stroke="#FFB612" opacity="0.6" stroke-dasharray="2,2"/>
+    <circle id="miniDot" cx="0" cy="${H-4}" r="4" fill="#FFB612" stroke="#0a0e13" stroke-width="1.5"/>
+  `;
+}
+
+function updateMiniMap(mi) {
+  const W = 280, H = 70;
+  const samples = ELEV;
+  const minE = Math.min(...samples), maxE = Math.max(...samples), range = maxE - minE;
+  const idx = Math.max(0, Math.min(samples.length-1, Math.round((mi/26.2)*(samples.length-1))));
+  const xx = (mi/26.2)*W;
+  const yy = H - 8 - ((samples[idx] - minE)/range) * (H - 18);
+  const cross = document.getElementById('miniCross');
+  const dot = document.getElementById('miniDot');
+  if (cross) { cross.setAttribute('x1', xx); cross.setAttribute('x2', xx); }
+  if (dot) { dot.setAttribute('cx', xx); dot.setAttribute('cy', yy); }
+  const you = document.getElementById('miniYou');
+  if (you) you.textContent = `YOU \u00b7 M ${mi.toFixed(1)}`;
+}
+
+/* =============================================================
+   COURSE MAP \u2014 removed; full-width elevation chart used instead
+   ============================================================= */
+function buildCourseMap() {
+  const svg = document.getElementById('courseMapSvg');
+  if (!svg) return;
+  // Stylized route polyline through Pittsburgh \u2014 not GPS-accurate but
+  // captures the loop topology: downtown \u2192 north shore \u2192 west end \u2192
+  // south side \u2192 oakland (peak) \u2192 shadyside \u2192 highland park \u2192 strip \u2192 downtown
+  const W = 800, H = 460;
+  // route waypoints: [x,y, mile, label]
+  const route = [
+    [120, 320, 0, 'START'],
+    [180, 290, 1.5],
+    [240, 260, 3, 'PNC'],
+    [320, 240, 4],
+    [400, 230, 5],
+    [460, 250, 6.4, 'WEST END'],
+    [430, 310, 7.5],
+    [380, 350, 9],
+    [340, 360, 10, 'BIRMINGHAM'],
+    [380, 320, 10.8],
+    [440, 280, 11.4, 'FORBES PEAK'],
+    [510, 240, 12.6, 'SCHENLEY'],
+    [580, 230, 13.5],
+    [630, 250, 15],
+    [660, 280, 16.5, 'FRICK'],
+    [620, 320, 18, 'BLOOMFIELD'],
+    [560, 340, 19.5],
+    [500, 350, 20.5, 'HIGHLAND'],
+    [420, 380, 22],
+    [320, 380, 23.5, 'STRIP'],
+    [220, 360, 25],
+    [140, 340, 26.2, 'FINISH']
+  ];
+  // build smooth path
+  const pts = route.map(p => `${p[0]},${p[1]}`).join(' L ');
+  const pathD = `M ${pts}`;
+
+  // zone-colored segments
+  const zoneSegs = [];
+  for (let i = 0; i < route.length - 1; i++) {
+    const [x1,y1,mi1] = route[i];
+    const [x2,y2,mi2] = route[i+1];
+    const midMi = (mi1 + mi2) / 2;
+    const zone = ZONES.find(z => midMi >= z.startMi && midMi < z.endMi) || ZONES[ZONES.length-1];
+    zoneSegs.push(`<line x1="${x1}" y1="${y1}" x2="${x2}" y2="${y2}" stroke="${zone.color}" stroke-width="4" stroke-linecap="round"/>`);
+  }
+
+  // landmark pins
+  const pins = route.filter(r => r[3]).map(r => `
+    <g transform="translate(${r[0]},${r[1]})">
+      <circle r="5" fill="#0a0e13" stroke="#FFB612" stroke-width="1.5"/>
+      <circle r="2" fill="#FFB612"/>
+      <text x="9" y="3" fill="#E8DFC9" font-family="ui-monospace, monospace" font-size="9" letter-spacing="0.1em">${r[3]}</text>
+    </g>
+  `).join('');
+
+  // rivers (stylized)
+  const rivers = `
+    <path d="M 0 360 Q 200 380 350 360 T 800 380" stroke="#5B8CB8" stroke-width="3" fill="none" opacity="0.4"/>
+    <path d="M 350 360 Q 380 410 380 460" stroke="#5B8CB8" stroke-width="3" fill="none" opacity="0.4"/>
+    <text x="50" y="400" fill="#5B8CB8" font-family="ui-monospace, monospace" font-size="9" opacity="0.6" letter-spacing="0.1em">ALLEGHENY</text>
+    <text x="600" y="420" fill="#5B8CB8" font-family="ui-monospace, monospace" font-size="9" opacity="0.6" letter-spacing="0.1em">MONONGAHELA</text>
+  `;
+
+  // grid
+  const grid = [];
+  for (let g = 0; g <= 800; g += 80) grid.push(`<line x1="${g}" x2="${g}" y1="0" y2="${H}" stroke="rgba(255,182,18,0.04)"/>`);
+  for (let g = 0; g <= 460; g += 80) grid.push(`<line x1="0" x2="800" y1="${g}" y2="${g}" stroke="rgba(255,182,18,0.04)"/>`);
+
+  svg.innerHTML = `
+    <g>${grid.join('')}</g>
+    ${rivers}
+    <g>${zoneSegs.join('')}</g>
+    <g>${pins}</g>
+    <g transform="translate(120,320)">
+      <circle r="8" fill="#FFB612"/>
+      <circle r="14" fill="none" stroke="#FFB612" opacity="0.4"/>
+    </g>
+    <text x="20" y="30" fill="rgba(255,182,18,0.7)" font-family="ui-monospace, monospace" font-size="10" letter-spacing="0.2em">PITTSBURGH \u00b7 MARATHON ROUTE</text>
+    <text x="20" y="${H-15}" fill="rgba(232,223,201,0.4)" font-family="ui-monospace, monospace" font-size="9" letter-spacing="0.15em">SCHEMATIC \u2014 NOT TO SCALE</text>
+    <line id="mapMarker" x1="0" x2="0" y1="0" y2="0" stroke="#FFB612" stroke-width="0" />
+    <circle id="mapDot" cx="120" cy="320" r="5" fill="#FFB612" stroke="#0a0e13" stroke-width="2"/>
+  `;
+}
+
+function updateCourseMapMarker(mi) {
+  const dot = document.getElementById('mapDot');
+  if (!dot) return;
+  // interpolate route position
+  const route = [
+    [120,320,0],[180,290,1.5],[240,260,3],[320,240,4],[400,230,5],[460,250,6.4],
+    [430,310,7.5],[380,350,9],[340,360,10],[380,320,10.8],[440,280,11.4],[510,240,12.6],
+    [580,230,13.5],[630,250,15],[660,280,16.5],[620,320,18],[560,340,19.5],
+    [500,350,20.5],[420,380,22],[320,380,23.5],[220,360,25],[140,340,26.2]
+  ];
+  for (let i = 0; i < route.length - 1; i++) {
+    if (mi >= route[i][2] && mi <= route[i+1][2]) {
+      const t = (mi - route[i][2]) / (route[i+1][2] - route[i][2]);
+      const x = route[i][0] + t * (route[i+1][0] - route[i][0]);
+      const y = route[i][1] + t * (route[i+1][1] - route[i][1]);
+      dot.setAttribute('cx', x);
+      dot.setAttribute('cy', y);
+      return;
+    }
+  }
+}
+
+/* =============================================================
+   REVEAL ON SCROLL
+   ============================================================= */
+function setupReveal() {
+  // tag elements that should reveal
+  const targets = [
+    ...document.querySelectorAll('.principle'),
+    ...document.querySelectorAll('.zone-card'),
+    ...document.querySelectorAll('.section-head'),
+    ...document.querySelectorAll('.elev-wrap'),
+    ...document.querySelectorAll('.fuel-wrap'),
+    ...document.querySelectorAll('.wb-info'),
+    ...document.querySelectorAll('.wb-strip'),
+    ...document.querySelectorAll('.coach')
+  ];
+  targets.forEach((el, i) => {
+    el.classList.add('reveal');
+    if (el.classList.contains('principle')) {
+      el.classList.add(`delay-${i % 3 + 1}`);
+    }
+  });
+  const io = new IntersectionObserver((entries) => {
+    entries.forEach(e => {
+      if (e.isIntersecting) {
+        e.target.classList.add('in');
+        io.unobserve(e.target);
+      }
+    });
+  }, { threshold: 0.15 });
+  document.querySelectorAll('.reveal').forEach(el => io.observe(el));
+}
+
+/* =============================================================
+   SCROLL LOOP \u2014 single rAF drives mile rail + map markers
+   ============================================================= */
+let scrollTicking = false;
+function onScrollLoop() {
+  if (!scrollTicking) {
+    scrollTicking = true;
+    requestAnimationFrame(() => {
+      updateMileRail();
+      scrollTicking = false;
+    });
+  }
+}
+
+/* Hook scene activation into existing section observer.
+   Wraps the original applyActive to also call setActiveScene. */
+function setupSceneActivation() {
+  // simple piggyback observer
+  const ids = ['hero','elevation','zones','fuel','wristband','ifthen','coach'];
+  const visible = new Set();
+  const io = new IntersectionObserver((entries) => {
+    entries.forEach(e => {
+      if (e.isIntersecting) visible.add(e.target.id);
+      else visible.delete(e.target.id);
+    });
+    // pick the section closest to viewport center
+    let best = 'hero', bestDist = Infinity;
+    visible.forEach(id => {
+      const el = document.getElementById(id);
+      if (!el) return;
+      const r = el.getBoundingClientRect();
+      const center = r.top + r.height / 2;
+      const dist = Math.abs(center - window.innerHeight / 2);
+      if (dist < bestDist) { bestDist = dist; best = id; }
+    });
+    setActiveScene(best);
+    // show mini-map after leaving hero
+    const mini = document.getElementById('mini-map');
+    if (best !== 'hero') mini.classList.add('visible');
+    else mini.classList.remove('visible');
+  }, { rootMargin: '-30% 0px -30% 0px', threshold: [0, 0.01, 0.5, 1] });
+  ids.forEach(id => {
+    const el = document.getElementById(id);
+    if (el) io.observe(el);
+  });
+  // initial paint
+  setActiveScene('hero');
+}
+
+/* =============================================================
+   INIT
+   ============================================================= */
+document.addEventListener('DOMContentLoaded', () => {
+  buildScenes();
+  buildTopoBackground();
+  buildHeroTopo();
+  buildElevation();
+  buildZones();
+  buildFuel();
+  buildWristband();
+  buildIfThen();
+  buildMileTicks();
+  buildMiniMap();
+  setupPrint();
+  setupParallax();
+  setupSectionObserver();
+  setupSceneActivation();
+  setupReveal();
+
+  window.addEventListener('scroll', onScrollLoop, { passive: true });
+  onScrollLoop();
+
+  // Open first zone by default
+  document.querySelector('.zone-card[data-zone="Z1"]')?.classList.add('open');
+});
+</script>
+</body>
+</html>
