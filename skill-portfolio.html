@@ -462,7 +462,7 @@ footer {
 <script>
 const DATA = {
   stats: {
-    totalSkills: 32,
+    totalSkills: 40,
     projectSkills: 11,
     liveAgents: 6,
     subagents: "25+",
@@ -525,7 +525,7 @@ const DATA = {
       description: "End-of-session skill commander. 9-phase pipeline: scan, territory check, create, improve, destroy (approval required), memory update, backup, token audit, optional deep clean.",
       stats: [
         { val: "9", label: "Phases" },
-        { val: "33", label: "Skills Managed" },
+        { val: "40", label: "Skills Managed" },
         { val: "Auto", label: "Backup" }
       ]
     },
@@ -553,7 +553,6 @@ const DATA = {
     { name: "/edu-html", emoji: "🎓", category: "creative", desc: "Interactive HTML study guides — reveals, MC quiz, flip flashcards, and exam traps", example: "Built a CTI Test 2 guide with 40 concepts, MC quiz, flip cards, and exam trap alerts" },
     { name: "/joe-rogan", emoji: "🎙️", category: "creative", desc: "Interview-driven NotebookLM automation for podcasts and study materials", example: "Generates audio summaries, quizzes, and flashcards from document sources" },
     { name: "/yoda", emoji: "🧙", category: "creative", desc: "Plain-English explainer. Analogy first, then clear detail", example: "Explained KenPom efficiency ratings as a batting average for basketball teams" },
-    { name: "/templates", emoji: "🧩", category: "creative", desc: "Reusable HTML/CSS component catalog for Bob builds", example: "10 patterns: card grids, stat badges, tab navs, comparison layouts" },
     { name: "/sportscenter", emoji: "📺", category: "meta", desc: "Session recap: what was built, current state, next steps — chains ghengis-khan + name-tag", example: "Chains ghengis-khan → name-tag → john-wooden offer in one command" },
     { name: "/jarvis", emoji: "💡", category: "meta", desc: "Elite consultant: 3 short-term + 1 long-term idea grounded in current context", example: "Suggested publishing skill-portfolio to GitHub Pages as a long-term portfolio anchor" },
     { name: "/mario", emoji: "🍄", category: "meta", desc: "Token usage tracker with ranked efficiency recommendations", example: "Identified that a 7-agent whoop-report costs ~87K tokens per run" },
@@ -568,7 +567,18 @@ const DATA = {
     { name: "/stephen-covey", emoji: "📋", category: "workflow", desc: "Reorganizes the todolist using Covey Quadrant 2 framework", example: "Restructured 20+ tasks into Do Now, Schedule, Defer, and Done categories" },
     { name: "/critical-prompt", emoji: "🎯", category: "workflow", desc: "CRITICAL framework prompt builder — interviews you, then writes a structured Claude prompt", example: "Turned a vague request into a 200-word prompt with role, context, and criteria" },
     { name: "/github", emoji: "🐙", category: "workflow", desc: "GitHub repo management: push files, create repos, enable Pages, manage branches", example: "Pushed gaming-mindset.html to loganmatson.github.io/ai-class in 4 commands" },
-    { name: "/multiple-choice", emoji: "✅", category: "workflow", desc: "MC question quality guardrail — prevents answer-position bias and length bias", example: "Caught B-overuse in a 20-question quiz set where B was correct 14 times" }
+    { name: "/multiple-choice", emoji: "✅", category: "workflow", desc: "MC question quality guardrail — prevents answer-position bias and length bias", example: "Caught B-overuse in a 20-question quiz set where B was correct 14 times" },
+    { name: "/anthropic-research", emoji: "🔬", category: "research", desc: "Weekly Anthropic release tracker. Researches 5 sources, Opus-validates findings, scans skills for outdated patterns", example: "Caught a settings.json default flip in v2.1.133 and patched worktree.baseRef in one run" },
+    { name: "/walt-disney", emoji: "🎬", category: "creative", desc: "End-to-end web project: spec → deploy → custom domain. 9 phases. Owns cinematic landing pages and Kling video integration.", example: "Built loganmatson.com from spec to live domain — bought DNS, pushed to Pages, all in one session" },
+    { name: "/naval", emoji: "🥋", category: "meta", desc: "Personal skill-compounding gym. Mon = technical Claude Code mastery, Thu = high-stakes sales/pitch reps. Scored, persisted, dashboarded.", example: "Session 5 surfaced a missing BofA debit ingestion path in buffett — shipped Phase 1 fix same session" },
+    { name: "/pdf-creator", emoji: "📄", category: "creative", desc: "Visually striking matplotlib PDFs — analyst briefs, pitch decks, instructional content. Routes to canvas-design for static art.", example: "Generated a marathon nutrition protocol PDF with custom layout and zero generic Claude boxes" },
+    { name: "/deep-clean", emoji: "🧹", category: "meta", desc: "Monthly empire audit. Validates skill files, commands, memory, pipeline-state.json. Classifies issues by severity tier.", example: "Found 4 stale skill references, 2 missing frontmatter blocks, and 1 ghost command in one sweep" },
+    { name: "/mufasa", emoji: "🦁", category: "creative", desc: "Lineage book generator. 50K-token HTML heirloom in Jungle Book aesthetic. 6 Sonnet chapters; chapter 7 stays blank for Logan to handwrite.", example: "Translated the skill empire and dad-interview transcripts into a single-file inheritable artifact" },
+    { name: "/family-feud", emoji: "🥊", category: "meta", desc: "Decision arena. Vader + Moneyball + Wooden argue a decision; a fourth voice (the Host) names the actual tradeoff Logan is choosing between.", example: "Resolved a Q1 priority debate by naming the tradeoff: build mufasa now vs. ship buffett v2 first" },
+    { name: "/rolodex", emoji: "📇", category: "workflow", desc: "Networking command center. Reads contacts.xlsx, ranks who's overdue by Urgency Score, drafts via shakespeare, never sends.", example: "Surfaced 3 contacts past cadence and drafted a Tim re-engagement text in shakespeare's voice" },
+    { name: "/canvas-design", emoji: "🖼️", category: "creative", desc: "Static visual art — posters, gallery prints, museum-style PDFs. Two-step: design philosophy first, then visual expression.", example: "Owns the static-art lane; routes from pdf-creator Mode C for art-grade output" },
+    { name: "/frontend-design", emoji: "🎨", category: "creative", desc: "Interactive web aesthetic direction. Owns HTML/CSS/JS, React, PWAs. Commits to bold direction — avoids generic AI aesthetics.", example: "Auto-fires at bob-the-builder Phase 5; respects style_lock: brand on whoop-report + gordon-ramsay + edu-html" },
+    { name: "/ui-ux-pro-max", emoji: "📚", category: "creative", desc: "Design system catalog: 161 palettes, 57 font pairings, 161 product-type rules, 99 UX guidelines, 25 chart types. Lookup-only.", example: "Pulled the right palette + font pair for a Bob build in seconds — no aesthetic decision, just catalog lookup" }
   ]
 };
 
@@ -597,7 +607,7 @@ const CATEGORIES = {
 <!-- ───────────── HERO ───────────── -->
 <section class="hero">
   <div class="hero-eyebrow">Claude Code in VSCode</div>
-  <h1>32 Skills. 6 Agents. Measured.</h1>
+  <h1>40 Skills. 6 Agents. Measured.</h1>
   <p class="hero-sub">Custom AI skills built to research, analyze, plan, and write — each one tested, measured, and evolving through structured feedback loops.</p>
 </section>
 
@@ -671,7 +681,7 @@ function toggleTheme() {
 // Ticker
 (function() {
   const items = [
-    { label: "Total Skills", val: "32" },
+    { label: "Total Skills", val: "40" },
     { label: "Live Agents", val: "6" },
     { label: "Subagents", val: "25+" },
     { label: "Bob Builds", val: "20+" },

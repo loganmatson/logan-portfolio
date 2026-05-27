@@ -35,17 +35,19 @@ After ~30 seconds, these will be live:
 - https://loganmatson.github.io/logan-portfolio/
 - https://loganmatson.github.io/logan-portfolio/marathon-plan.html
 - https://loganmatson.github.io/logan-portfolio/scotland.html
+- https://loganmatson.github.io/logan-portfolio/skill-portfolio.html
 
 ## 4. Tell Logan / Claude to update the portfolio site
 
-Two HTML comments in `Personal/Career/Personal Website/portfolio/index.html` mark the spots where the URLs need to swap from `#` to the live links:
+Three HTML comments in `Personal/Career/Personal Website/portfolio/index.html` mark the spots where the URLs need to swap from `#` to the live links:
 
 ```
 <!-- TODO: replace href once Marathon Plan is pushed ... -->
 <!-- TODO: replace href once Scotland Itinerary is pushed ... -->
+<!-- TODO: replace href once logan-portfolio is pushed (Skill Portfolio) ... -->
 ```
 
-Then remove the `data-pending` attribute from those two `<a>` tags.
+Then remove the `data-pending` attribute from those three `<a>` tags.
 
 ## Security note
 
